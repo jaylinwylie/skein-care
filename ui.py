@@ -329,6 +329,7 @@ class Window(wx.Frame):
         self.catalog = catalog
         self.show_all = True  # Default to showing all skeins
         self.search_text = ""  # Initialize empty search text
+        self.sort_method = 3  # Default sort by count
 
         # Create the main panel and sizer
         self.panel = wx.Panel(self)
@@ -337,6 +338,7 @@ class Window(wx.Frame):
         # Create a menu bar
         menubar = wx.MenuBar()
         file_menu = wx.Menu()
+
 
         # Add "Add New Skein" menu item
         add_skein_item = file_menu.Append(wx.ID_ANY, "Add New Skein")
@@ -351,6 +353,20 @@ class Window(wx.Frame):
         self.Bind(wx.EVT_MENU, self.toggle_skeins_visibility, self.toggle_item)
 
         menubar.Append(file_menu, "&File")
+
+        sort_menu = wx.Menu()
+        sort_by_brand_item = sort_menu.Append(0, "Brand")
+        sort_by_sku_item = sort_menu.Append(1, "SKU")
+        sort_by_name_item = sort_menu.Append(2, "Name")
+        sort_by_count = sort_menu.Append(3, "Count")
+
+        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_brand_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_sku_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_name_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_count)
+
+        menubar.Append(sort_menu, "&Sort")
+
         self.SetMenuBar(menubar)
 
         self.search_bar = wx.SearchCtrl(self.panel)
@@ -381,7 +397,8 @@ class Window(wx.Frame):
         # Clear existing widgets
         self.grid_sizer.Clear(True)
 
-        # Add skein panels to the grid
+        # Collect all visible skeins
+        visible_skeins = []
         for brand, brand_skeins in self.catalog.skeins.items():
             for sku, skein in brand_skeins.items():
                 # Check if we should show this skein
@@ -399,16 +416,50 @@ class Window(wx.Frame):
                 ):
                     continue  # Skip if doesn't match search
 
-                # Create skein panel
-                skein_panel = SkeinPanel(self.scroll, skein, count)
-                skein_panel.Bind(EVT_COUNT_CHANGED, lambda evt, b=brand, s=sku: self.update_skein_count(b, s, evt.get_value()))
+                # Add to visible skeins
+                visible_skeins.append((brand, sku, skein, count))
 
-                # Add to grid
-                self.grid_sizer.Add(skein_panel, 0, wx.EXPAND)
+        # Sort the skeins based on the selected sort method
+        if self.sort_method == 0:  # Sort by brand
+            visible_skeins.sort(key=lambda x: x[0].lower())  # Sort by brand (case-insensitive)
+        elif self.sort_method == 1:  # Sort by SKU
+            visible_skeins.sort(key=lambda x: int(x[1]) if x[1].isdecimal() else -1)  # Sort by SKU (case-insensitive)
+        elif self.sort_method == 2:  # Sort by name
+            visible_skeins.sort(key=lambda x: x[2].name.lower())  # Sort by name (case-insensitive)
+        elif self.sort_method == 3:  # Sort by count
+            visible_skeins.sort(key=lambda x: x[3], reverse=True)  # Sort by count (descending)
+
+        # Add sorted skeins to the grid
+        for brand, sku, skein, count in visible_skeins:
+            # Create skein panel
+            skein_panel = SkeinPanel(self.scroll, skein, count)
+            skein_panel.Bind(EVT_COUNT_CHANGED, lambda evt, b=brand, s=sku: self.update_skein_count(b, s, evt.get_value()))
+
+            # Add to grid
+            self.grid_sizer.Add(skein_panel, 0, wx.EXPAND)
 
         # Update layout
         self.grid_sizer.Layout()
         self.scroll.FitInside()
+
+    def sort_skeins(self, event):
+        id = event.GetId()
+        # Brand, Sku, Name, Count
+
+        if id == 0:
+            self.sort_method = 0  # Sort by brand
+        elif id == 1:
+            self.sort_method = 1  # Sort by SKU
+        elif id == 2:
+            self.sort_method = 2  # Sort by name
+        elif id == 3:
+            self.sort_method = 3  # Sort by count
+        else:
+            raise ValueError("Invalid sort id.")
+
+        self.populate_grid()
+
+
 
     def toggle_skeins_visibility(self, event):
         self.show_all = event.IsChecked()
