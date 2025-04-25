@@ -1,26 +1,30 @@
-from PySide6 import QtWidgets, QtCore
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen, QAction
+import wx
+import wx.grid
 import json
 import os
+from skein import Skein
 
-from skein import Skein, Catalog
+wxEVT_COUNT_CHANGED = wx.NewEventType()
+EVT_COUNT_CHANGED = wx.PyEventBinder(wxEVT_COUNT_CHANGED, 1)
 
 
-class SkeinWidget(QtWidgets.QWidget):
-    countChanged = Signal(int)
+class CountChangedEvent(wx.PyCommandEvent):
+    def __init__(self, etype, eid, value=0):
+        wx.PyCommandEvent.__init__(self, etype, eid)
+        self.value = value
 
-    def __init__(self, skein: Skein, count: int = 0, parent=None):
-        super().__init__(parent)
+    def get_value(self):
+        return self.value
+
+
+class SkeinPanel(wx.Panel):
+    def __init__(self, parent, skein, count=0):
+        super().__init__(parent, size=wx.Size(100, 100))
         self.skein = skein
         self.count = count
+        self.SetMinSize(wx.Size(100, 100))
+        self.SetMaxSize(wx.Size(-1, 100))
 
-        self.setMinimumSize(100, 100)
-        self.setMaximumHeight(100)
-        # Create layout
-        layout = QtWidgets.QVBoxLayout(self)
-
-        # Calculate average color
         average_color = [0, 0, 0]
         for color in skein.color:
             average_color[0] += color[0]
@@ -31,106 +35,70 @@ class SkeinWidget(QtWidgets.QWidget):
         average_color[1] /= len(skein.color)
         average_color[2] /= len(skein.color)
 
-        # Calculate relative luminance
         luminance = (0.299 * average_color[0] +
                      0.587 * average_color[1] +
                      0.114 * average_color[2]) / 255
 
-        # Use white text for dark backgrounds, black text for light backgrounds
-        text_color = [0, 0, 0] if luminance > 0.5 else [255, 255, 255]
-        text_color_str = f"rgb({text_color[0]}, {text_color[1]}, {text_color[2]})"
-        text_color_str_a = f"rgba({text_color[0]}, {text_color[1]}, {text_color[2]}, 128)"
+        self.text_color = wx.BLACK if luminance > 0.5 else wx.WHITE
 
-        # Create label for skein info
-        self.infoLabel = QtWidgets.QLabel(f"{skein.brand.upper()}\n{skein.sku}\n{skein.name}")
-        self.infoLabel.setAlignment(Qt.AlignCenter)
-        self.infoLabel.setWordWrap(True)
-        self.infoLabel.setStyleSheet(f"color: {text_color_str}")
+        sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Create custom spinbox layout
-        spinbox_container = QtWidgets.QHBoxLayout()
-        spinbox_container.setSpacing(0)
-        spinbox_container.setContentsMargins(0, 0, 0, 0)
+        self.info_label = wx.StaticText(self, label=f"{skein.brand.upper()}\n{skein.sku}\n{skein.name}")
+        self.info_label.SetForegroundColour(self.text_color)
 
-        button_style = f"""
-            QPushButton {{
-                background: transparent;
-                border: none;
-                color: {text_color_str};
-            }}
-            QPushButton:hover {{
-                background: {text_color_str_a};
-            }}
-        """
+        spinbox_sizer = wx.BoxSizer()
 
-        # Create minus button
-        self.minus_button = QtWidgets.QPushButton("-")
-        self.minus_button.setFixedSize(25, 25)
-        self.minus_button.clicked.connect(self._decrease_value)
-        self.minus_button.setStyleSheet(button_style)
+        self.minus_button = wx.Button(self, label="-", size=wx.Size(35, 35))
+        self.minus_button.Bind(wx.EVT_BUTTON, self._decrease_value)
 
-        # Create the number display
-        self.value_label = QtWidgets.QLineEdit(str(count))
-        self.value_label.setAlignment(Qt.AlignCenter)
-        self.value_label.setFixedWidth(40)
-        self.value_label.setStyleSheet(f"""
-            QLineEdit {{
-                background: transparent;
-                border: none;
-                color: {text_color_str};
-            }}
-        """)
-        self.value_label.setReadOnly(True)
+        self.value_text = wx.TextCtrl(self, value=str(count), size=wx.Size(70, 35), style=wx.TE_CENTER)
 
-        # Create plus button
-        self.plus_button = QtWidgets.QPushButton("+")
-        self.plus_button.setFixedSize(25, 25)
-        self.plus_button.clicked.connect(self._increase_value)
-        self.plus_button.setStyleSheet(button_style)
+        self.plus_button = wx.Button(self, label="+", size=wx.Size(35, 35))
+        self.plus_button.Bind(wx.EVT_BUTTON, self._increase_value)
 
-        # Add widgets to the container
-        spinbox_container.addWidget(self.minus_button)
-        spinbox_container.addWidget(self.value_label)
-        spinbox_container.addWidget(self.plus_button)
+        spinbox_sizer.Add(self.minus_button, 0, wx.ALIGN_CENTER)
+        spinbox_sizer.Add(self.value_text, 0, wx.ALIGN_CENTER)
+        spinbox_sizer.Add(self.plus_button, 0, wx.ALIGN_CENTER)
 
-        # Add widgets to layout
-        layout.addWidget(self.infoLabel)
-        layout.addLayout(spinbox_container)
+        sizer.Add(self.info_label, 1, wx.ALIGN_CENTER | wx.ALL, 5)
+        sizer.Add(spinbox_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 5)
 
-        # Set layout margins
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        self.SetSizer(sizer)
 
+        self.Bind(wx.EVT_PAINT, self.on_paint)
 
-
-    def _decrease_value(self):
-        current = int(self.value_label.text())
+    def _decrease_value(self, event):
+        current = int(self.value_text.GetValue())
         if current > 0:
             new_value = current - 1
-            self.value_label.setText(str(new_value))
+            self.value_text.SetValue(str(new_value))
             self.count = new_value
-            self.countChanged.emit(new_value)
+            evt = CountChangedEvent(wxEVT_COUNT_CHANGED, self.GetId(), new_value)
+            wx.PostEvent(self, evt)
 
-    def _increase_value(self):
-        current = int(self.value_label.text())
+    def _increase_value(self, event):
+        current = int(self.value_text.GetValue())
         if current < 999:
             new_value = current + 1
-            self.value_label.setText(str(new_value))
+            self.value_text.SetValue(str(new_value))
             self.count = new_value
-            self.countChanged.emit(new_value)
+            evt = CountChangedEvent(wxEVT_COUNT_CHANGED, self.GetId(), new_value)
+            wx.PostEvent(self, evt)
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+    def on_paint(self, event):
+        dc = wx.PaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+
+        # Get the size of the panel
+        width, height = self.GetSize()
 
         # Draw background
-        painter.fillRect(self.rect(), Qt.GlobalColor.darkGray)
+        gc.SetBrush(wx.Brush(wx.Colour(64, 64, 64)))
+        gc.DrawRectangle(0, 0, width, height)
 
         # Draw border
-        pen = QPen(Qt.black)
-        pen.setWidth(1)
-        painter.setPen(pen)
-        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        gc.SetPen(wx.Pen(wx.BLACK, 1))
+        gc.DrawRectangle(0, 0, width, height)
 
         # Draw color bands
         colors = self.skein.color
@@ -141,157 +109,168 @@ class SkeinWidget(QtWidgets.QWidget):
         if num_colors == 1:
             # Single color - fill the whole area
             r, g, b = colors[0]
-            painter.fillRect(self.rect(), QColor(r, g, b))
+            gc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
+            gc.DrawRectangle(0, 0, width, height)
         else:
             # Multiple colors - draw horizontal bands
-            band_width = self.width() / num_colors
+            band_width = width / num_colors
             for i, color in enumerate(colors):
                 r, g, b = color
-                band_rect = QtCore.QRect(
-                        int(i * band_width),
-                        0,
-                        int(band_width),
-                        self.height()
-                )
-                painter.fillRect(band_rect, QColor(r, g, b))
+                gc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
+                gc.DrawRectangle(i * band_width, 0, band_width, height)
 
 
-class ColorWidget(QtWidgets.QWidget):
-    colorChanged = Signal(list)
-
-    def __init__(self, color=None, parent=None):
-        super().__init__(parent)
+class ColorPanel(wx.Panel):
+    def __init__(self, parent, color=None):
+        super().__init__(parent, size=wx.Size(50, 50))
         self.color = color or [255, 255, 255]
+        self.SetMinSize(wx.Size(50, 50))
+        self.SetMaxSize(wx.Size(50, 50))
 
-        # Set up the widget
-        self.setMinimumSize(50, 50)
-        self.setMaximumSize(50, 50)
+        # Bind events
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_LEFT_DOWN, self.on_click)
 
-        # Enable mouse tracking for click events
-        self.setMouseTracking(True)
+    def OnPaint(self, event):
+        dc = wx.PaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        # Get the size of the panel
+        width, height = self.GetSize()
 
         # Draw border
-        pen = QPen(Qt.black)
-        pen.setWidth(1)
-        painter.setPen(pen)
-        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        gc.SetPen(wx.Pen(wx.BLACK, 1))
+        gc.DrawRectangle(0, 0, width, height)
 
         # Fill with color
         r, g, b = self.color
-        painter.fillRect(self.rect().adjusted(1, 1, -1, -1), QColor(r, g, b))
+        gc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
+        gc.DrawRectangle(1, 1, width-2, height-2)
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            color = QtWidgets.QColorDialog.getColor(QColor(self.color[0], self.color[1], self.color[2]), self)
-            if color.isValid():
-                self.color = [color.red(), color.green(), color.blue()]
-                self.update()
-                self.colorChanged.emit(self.color)
+    def on_click(self, event):
+        color_data = wx.ColourData()
+        color_data.SetColour(wx.Colour(self.color[0], self.color[1], self.color[2]))
+
+        dlg = wx.ColourDialog(self, color_data)
+        if dlg.ShowModal() == wx.ID_OK:
+            wx_color = dlg.GetColourData().GetColour()
+            self.color = [wx_color.Red(), wx_color.Green(), wx_color.Blue()]
+            self.Refresh()
+
+            # Notify parent of color change
+            evt = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, self.GetId())
+            evt.SetEventObject(self)
+            wx.PostEvent(self.GetParent(), evt)
+
+        dlg.Destroy()
 
 
-class AddSkeinDialog(QtWidgets.QDialog):
-    def __init__(self, catalog, parent=None):
-        super().__init__(parent)
+class AddSkeinDialog(wx.Dialog):
+    def __init__(self, parent, catalog):
+        super().__init__(parent, title="Add New Skein")
         self.catalog = catalog
         self.colors = [[255, 255, 255]]  # Default to white
 
-        self.setWindowTitle("Add New Skein")
-        self.setMinimumWidth(400)
-
-        layout = QtWidgets.QVBoxLayout(self)
+        # Create the main sizer
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Brand input
-        brand_layout = QtWidgets.QHBoxLayout()
-        brand_label = QtWidgets.QLabel("Brand:\t")
-        self.brand_input = QtWidgets.QLineEdit()
-        brand_layout.addWidget(brand_label)
-        brand_layout.addWidget(self.brand_input)
-        layout.addLayout(brand_layout)
+        brand_sizer = wx.BoxSizer()
+        brand_label = wx.StaticText(self, label="Brand:\t")
+        self.brand_input = wx.TextCtrl(self)
+        brand_sizer.Add(brand_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        brand_sizer.Add(self.brand_input, 1, wx.EXPAND)
+        main_sizer.Add(brand_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # SKU input
-        sku_layout = QtWidgets.QHBoxLayout()
-        sku_label = QtWidgets.QLabel("SKU:\t")
-        self.sku_input = QtWidgets.QLineEdit()
-        sku_layout.addWidget(sku_label)
-        sku_layout.addWidget(self.sku_input)
-        layout.addLayout(sku_layout)
+        sku_sizer = wx.BoxSizer()
+        sku_label = wx.StaticText(self, label="SKU:\t")
+        self.sku_input = wx.TextCtrl(self)
+        sku_sizer.Add(sku_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        sku_sizer.Add(self.sku_input, 1, wx.EXPAND)
+        main_sizer.Add(sku_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Name input
-        name_layout = QtWidgets.QHBoxLayout()
-        name_label = QtWidgets.QLabel("Name:\t")
-        self.name_input = QtWidgets.QLineEdit()
-        name_layout.addWidget(name_label)
-        name_layout.addWidget(self.name_input)
-        layout.addLayout(name_layout)
+        name_sizer = wx.BoxSizer()
+        name_label = wx.StaticText(self, label="Name:\t")
+        self.name_input = wx.TextCtrl(self)
+        name_sizer.Add(name_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        name_sizer.Add(self.name_input, 1, wx.EXPAND)
+        main_sizer.Add(name_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Colors section
-        colors_layout = QtWidgets.QVBoxLayout()
-        colors_label = QtWidgets.QLabel("Colours:\t")
-        colors_layout.addWidget(colors_label)
+        colors_sizer = wx.BoxSizer(wx.VERTICAL)
+        colors_label = wx.StaticText(self, label="Colours:")
+        colors_sizer.Add(colors_label, 0, wx.ALL, 5)
 
-        # Color widgets container
-        self.colors_container = QtWidgets.QWidget()
-        self.colors_container_layout = QtWidgets.QHBoxLayout(self.colors_container)
-        self.colors_container_layout.setAlignment(Qt.AlignLeft)
+        # Color panels container
+        self.colors_panel = wx.Panel(self)
+        self.colors_sizer = wx.BoxSizer()
+        self.colors_panel.SetSizer(self.colors_sizer)
 
-        # Add initial color widget
-        self.add_color_widget(self.colors[0])
+        # Add initial color panel
+        self.add_color_panel(self.colors[0])
+
+        colors_sizer.Add(self.colors_panel, 0, wx.EXPAND | wx.ALL, 5)
 
         # Add/Remove color buttons
-        color_buttons_layout = QtWidgets.QHBoxLayout()
-        add_color_button = QtWidgets.QPushButton("Add Color")
-        add_color_button.clicked.connect(self.add_color)
-        remove_color_button = QtWidgets.QPushButton("Remove Color")
-        remove_color_button.clicked.connect(self.remove_color)
-        color_buttons_layout.addWidget(add_color_button)
-        color_buttons_layout.addWidget(remove_color_button)
+        color_buttons_sizer = wx.BoxSizer()
+        add_color_button = wx.Button(self, label="Add Color")
+        add_color_button.Bind(wx.EVT_BUTTON, self.add_color)
+        remove_color_button = wx.Button(self, label="Remove Color")
+        remove_color_button.Bind(wx.EVT_BUTTON, self.remove_color)
+        color_buttons_sizer.Add(add_color_button, 0, wx.EXPAND | wx.ALL, 5)
+        color_buttons_sizer.Add(remove_color_button, 0, wx.EXPAND | wx.ALL, 5)
 
-        colors_layout.addWidget(self.colors_container)
-        colors_layout.addLayout(color_buttons_layout)
-        layout.addLayout(colors_layout)
+        main_sizer.Add(color_buttons_sizer, 0, wx.EXPAND, 5)
+        main_sizer.Add(colors_sizer, 0, wx.EXPAND, 5)
 
         # Buttons
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        button_sizer = wx.StdDialogButtonSizer()
+        ok_button = wx.Button(self, wx.ID_OK)
+        cancel_button = wx.Button(self, wx.ID_CANCEL)
+        button_sizer.AddButton(ok_button)
+        button_sizer.AddButton(cancel_button)
+        button_sizer.Realize()
 
-    def add_color_widget(self, color):
-        color_widget = ColorWidget(color)
-        color_widget.colorChanged.connect(self.update_color)
-        self.colors_container_layout.addWidget(color_widget)
+        main_sizer.Add(button_sizer, 0, wx.EXPAND, 5)
 
-    def add_color(self):
+        self.SetSizer(main_sizer)
+        main_sizer.SetMinSize(wx.Size(400, 300))
+        main_sizer.Fit(self)
+
+    def add_color_panel(self, color):
+        color_panel = ColorPanel(self.colors_panel, color)
+        color_panel.Bind(wx.EVT_BUTTON, self.update_color)
+        self.colors_sizer.Add(color_panel, 0, wx.RIGHT, 5)
+        self.colors_panel.Layout()
+
+    def add_color(self, event):
         self.colors.append([255, 255, 255])
-        self.add_color_widget(self.colors[-1])
+        self.add_color_panel(self.colors[-1])
 
-    def remove_color(self):
+    def remove_color(self, event):
         if len(self.colors) > 1:
             self.colors.pop()
-            item = self.colors_container_layout.takeAt(self.colors_container_layout.count() - 1)
-            if item.widget():
-                item.widget().deleteLater()
+            # Remove the last color panel
+            self.colors_sizer.GetItem(self.colors_sizer.GetItemCount() - 1).GetWindow().Destroy()
+            self.colors_panel.Layout()
 
-    def update_color(self, color):
-        sender = self.sender()
+    def update_color(self, event):
+        # Find which color panel was changed
+        panel = event.GetEventObject()
         index = 0
-        for i in range(self.colors_container_layout.count()):
-            if self.colors_container_layout.itemAt(i).widget() == sender:
+        for i in range(self.colors_sizer.GetItemCount()):
+            if self.colors_sizer.GetItem(i).GetWindow() == panel:
                 index = i
                 break
-        self.colors[index] = color
+        self.colors[index] = panel.color
 
     def get_skein_data(self):
         return {
-            "brand": self.brand_input.text(),
-            "sku": self.sku_input.text(),
-            "name": self.name_input.text(),
+            "brand": self.brand_input.GetValue(),
+            "sku": self.sku_input.GetValue(),
+            "name": self.name_input.GetValue(),
             "colors": self.colors
         }
 
@@ -301,7 +280,7 @@ class AddSkeinDialog(QtWidgets.QDialog):
         sku = data["sku"]
 
         if not brand or not sku:
-            QtWidgets.QMessageBox.warning(self, "Input Error", "Brand and SKU are required.")
+            wx.MessageBox("Brand and SKU are required.", "Input Error", wx.OK | wx.ICON_WARNING)
             return False
 
         # Create or update brand file
@@ -314,7 +293,7 @@ class AddSkeinDialog(QtWidgets.QDialog):
                 with open(brand_file, 'r') as f:
                     brand_data = json.load(f)
             except Exception as e:
-                QtWidgets.QMessageBox.warning(self, "Error", f"Error loading brand file: {e}")
+                wx.MessageBox(f"Error loading brand file: {e}", "Error", wx.OK | wx.ICON_ERROR)
                 return False
 
         # Add or update skein data
@@ -328,7 +307,7 @@ class AddSkeinDialog(QtWidgets.QDialog):
             with open(brand_file, 'w') as f:
                 json.dump(brand_data, f, indent=4)
         except Exception as e:
-            QtWidgets.QMessageBox.warning(self, "Error", f"Error saving brand file: {e}")
+            wx.MessageBox(f"Error saving brand file: {e}", "Error", wx.OK | wx.ICON_ERROR)
             return False
 
         # Add to catalog
@@ -343,84 +322,66 @@ class AddSkeinDialog(QtWidgets.QDialog):
         return True
 
 
-class Window(QtWidgets.QMainWindow):
-    def __init__(self, library: dict, catalog: Catalog, parent=None):
-        super().__init__(parent)
+class Window(wx.Frame):
+    def __init__(self, library, catalog, parent=None):
+        super().__init__(parent, title="Skein Care", size=wx.Size(800, 600))
         self.library = library
         self.catalog = catalog
         self.show_all = True  # Default to showing all skeins
         self.search_text = ""  # Initialize empty search text
 
-        # Set window properties
-        self.setWindowTitle("Skein Care")
-        self.setMinimumSize(400, 600)
+        # Create the main panel and sizer
+        self.panel = wx.Panel(self)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Dont allow resizing
-        self.setFixedSize(self.size())
+        # Create a menu bar
+        menubar = wx.MenuBar()
+        file_menu = wx.Menu()
 
-        # Create central widget and main layout
-        central_widget = QtWidgets.QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
-
-        # Create menu bar
-        menubar = self.menuBar()
-        file_menu = menubar.addMenu("File")
-
-        # Add "Add New Skein" action
-        add_skein_action = QAction("Add New Skein", self)
-        add_skein_action.triggered.connect(self.show_add_skein_dialog)
-        file_menu.addAction(add_skein_action)
+        # Add "Add New Skein" menu item
+        add_skein_item = file_menu.Append(wx.ID_ANY, "Add New Skein")
+        self.Bind(wx.EVT_MENU, self.show_add_skein_dialog, add_skein_item)
 
         # Add separator
-        file_menu.addSeparator()
+        file_menu.AppendSeparator()
 
         # Add toggle for showing/hiding skeins not in library
-        self.toggle_action = QAction("Show All Skeins", self)
-        self.toggle_action.setCheckable(True)
-        self.toggle_action.setChecked(True)
-        self.toggle_action.toggled.connect(self.toggle_skeins_visibility)
-        file_menu.addAction(self.toggle_action)
+        self.toggle_item = file_menu.AppendCheckItem(wx.ID_ANY, "Show All Skeins")
+        self.toggle_item.Check(True)
+        self.Bind(wx.EVT_MENU, self.toggle_skeins_visibility, self.toggle_item)
 
-        # Create search bar
-        search_layout = QtWidgets.QHBoxLayout()
-        search_label = QtWidgets.QLabel("Search:")
-        self.search_bar = QtWidgets.QLineEdit()
-        self.search_bar.setPlaceholderText("Search by SKU or name...")
-        self.search_bar.textChanged.connect(self.on_search_text_changed)
-        search_layout.addWidget(search_label)
-        search_layout.addWidget(self.search_bar)
-        main_layout.addLayout(search_layout)
+        menubar.Append(file_menu, "&File")
+        self.SetMenuBar(menubar)
+
+        self.search_bar = wx.SearchCtrl(self.panel)
+        self.search_bar.SetHint("Search by SKU or name...")
+        self.search_bar.Bind(wx.EVT_SEARCH, self.search)
+        main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.ALL, 10)
 
         # Create scroll area for skeins grid
-        scroll_area = QtWidgets.QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        main_layout.addWidget(scroll_area)
+        self.scroll = wx.ScrolledWindow(self.panel)
+        self.scroll.SetScrollRate(10, 10)
 
-        # Create widget to hold the grid
-        self.grid_widget = QtWidgets.QWidget()
-        scroll_area.setWidget(self.grid_widget)
+        # Create grid sizer for skeins
+        self.grid_sizer = wx.GridSizer(rows=0, cols=5, hgap=10, vgap=10)
 
-        # Create grid layout for skeins
-        self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
-        self.grid_layout.setSpacing(10)
-        self.grid_layout.setAlignment(Qt.AlignTop)
+        # Set up the scroll area
+        self.scroll.SetSizer(self.grid_sizer)
+        main_sizer.Add(self.scroll, 1, wx.EXPAND | wx.ALL, 10)
+
+        self.panel.SetSizer(main_sizer)
 
         # Populate the grid with skeins
         self.populate_grid()
 
+        # Set a minimum size
+        self.SetMinSize(self.GetSize())
+
     def populate_grid(self):
         # Clear existing widgets
-        while self.grid_layout.count():
-            item = self.grid_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        self.grid_sizer.Clear(True)
 
-        # Track position in grid
-        row, col = 0, 0
-        max_cols = 5  # Number of columns in the grid
-
-        # Add skein widgets to the grid
+        # Add skein panels to the grid
         for brand, brand_skeins in self.catalog.skeins.items():
             for sku, skein in brand_skeins.items():
                 # Check if we should show this skein
@@ -433,47 +394,43 @@ class Window(QtWidgets.QMainWindow):
 
                 # Check if skein matches search criteria
                 if self.search_text and not (
-                    self.search_text.lower() in sku.lower() or 
+                    self.search_text.lower() in sku.lower() or
                     self.search_text.lower() in skein.name.lower()
                 ):
                     continue  # Skip if doesn't match search
 
-                # Create skein widget
-                skein_widget = SkeinWidget(skein, count)
-                skein_widget.countChanged.connect(lambda value, b=brand, s=sku: self.update_skein_count(b, s, value))
+                # Create skein panel
+                skein_panel = SkeinPanel(self.scroll, skein, count)
+                skein_panel.Bind(EVT_COUNT_CHANGED, lambda evt, b=brand, s=sku: self.update_skein_count(b, s, evt.get_value()))
 
                 # Add to grid
-                self.grid_layout.addWidget(skein_widget, row, col)
+                self.grid_sizer.Add(skein_panel, 0, wx.EXPAND)
 
-                # Move to next position
-                col += 1
-                if col >= max_cols:
-                    col = 0
-                    row += 1
+        # Update layout
+        self.grid_sizer.Layout()
+        self.scroll.FitInside()
 
-    def toggle_skeins_visibility(self, show_all):
-        self.show_all = show_all
-        if show_all:
-            self.toggle_action.setText("Show All Skeins")
+    def toggle_skeins_visibility(self, event):
+        self.show_all = event.IsChecked()
+        if self.show_all:
+            self.toggle_item.SetItemLabel("Show All Skeins")
         else:
-            self.toggle_action.setText("Show Library Only")
+            self.toggle_item.SetItemLabel("Show Library Only")
         self.populate_grid()
 
-    def on_search_text_changed(self, text):
-        self.search_text = text
+    def search(self, event):
+        self.search_text = event.GetString()
         self.populate_grid()
 
-    def show_add_skein_dialog(self):
-        dialog = AddSkeinDialog(self.catalog, self)
-        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+    def show_add_skein_dialog(self, event):
+        dialog = AddSkeinDialog(self, self.catalog)
+        if dialog.ShowModal() == wx.ID_OK:
             if dialog.save_skein():
-                QtWidgets.QMessageBox.information(self, "Success", "Skein added successfully.")
-                self.populate_grid()  # Refresh the grid to show the new skein
+                wx.MessageBox("Skein added successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
+                self.populate_grid()
+        dialog.Destroy()
 
     def update_skein_count(self, brand, sku, count):
-        # Ensure brand exists in library
         if brand not in self.library:
             self.library[brand] = {}
-
-        # Update count
         self.library[brand][sku] = count
