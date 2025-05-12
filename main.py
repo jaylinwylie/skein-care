@@ -42,6 +42,7 @@ else:
 
 print("Creating main window...")
 window = Window(library, catalog)
+
 window.Show()
 app.SetTopWindow(window)
 

@@ -7,10 +7,11 @@ from skein import Skein
 
 class ColorDisplayPanel(wx.Panel):
     def __init__(self, parent, skein):
-        super().__init__(parent, size=wx.Size(100, 50))
+        super().__init__(parent, size=wx.Size(100, 100))
         self.skein = skein
-        self.SetMinSize(wx.Size(100, 50))
+        self.SetMinSize(wx.Size(100, 300))
         self.Bind(wx.EVT_PAINT, self.on_paint)
+        self.average_lightness = self.calculate_average_lightness(self.skein.color)
 
     def on_paint(self, event):
         dc = wx.PaintDC(self)
@@ -19,7 +20,6 @@ class ColorDisplayPanel(wx.Panel):
         width, height = self.GetSize()
 
         # Draw background
-        # dc.SetBrush(wx.Brush(wx.Colour(64, 64, 64)))
         dc.SetPen(wx.TRANSPARENT_PEN)
         dc.DrawRectangle(0, 0, width, height)
 
@@ -45,28 +45,59 @@ class ColorDisplayPanel(wx.Panel):
                 dc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
                 dc.DrawRectangle(int(i * band_width), 0, int(band_width), height)
 
+        # Create a transparent DC for drawing text
+        gc = wx.GraphicsContext.Create(dc)
+        if gc:
+            # Calculate text color based on average lightness
+            text_color = wx.BLACK if self.average_lightness > 0.5 else wx.WHITE
+
+            # Set font and text color
+            font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+            gc.SetFont(font, text_color)
+
+            skein_title = f"{self.skein.brand.upper()} {self.skein.sku}"
+
+            # Calculate text position (centered)
+            text_width, text_height = gc.GetTextExtent(skein_title)
+            text_x = (width - text_width) / 2
+            text_y = height / 2 - text_height
+
+            # Draw text
+            gc.DrawText(skein_title, text_x, text_y)
+
+            # Draw second line (name)
+            text_width, text_height = gc.GetTextExtent(self.skein.name)
+            text_x = (width - text_width) / 2
+            text_y = height / 2 + 5
+
+            gc.DrawText(self.skein.name, text_x, text_y)
+
+    @staticmethod
+    def calculate_average_lightness(colors):
+        """Calculate the average lightness of the colors"""
+        if not colors:
+            return 0.5  # Default middle lightness
+
+        total_lightness = 0
+        for color in colors:
+            r, g, b = color
+            lightness = wx.Colour(r, g, b).GetLuminance()
+            total_lightness += lightness
+
+        return total_lightness / len(colors)
+
 
 class SkeinPanel(wx.Panel):
     def __init__(self, parent, skein, count=0, callback=None):
-        super().__init__(parent, size=wx.Size(100, 100))
+        super().__init__(parent, size=wx.Size(150, 200))
         self.skein = skein
         self.count = count
         self.brand = skein.brand
         self.sku = skein.sku
         self.callback = callback
-        self.SetMinSize(wx.Size(100, 100))
-        self.SetMaxSize(wx.Size(-1, 100))
+        self.SetMinSize(wx.Size(150, 200))
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Add text in a dedicated area above the color panel
-        text = f"{self.skein.brand.upper()}\n{self.skein.sku}\n{self.skein.name}"
-        self.text_label = wx.StaticText(self, label=text, style=wx.ALIGN_CENTER)
-        self.text_label.SetForegroundColour(wx.BLACK)
-        font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.text_label.SetFont(font)
-
-        sizer.Add(self.text_label, 0, wx.ALIGN_CENTER | wx.TOP, 5)
 
         # Add color display panel
         self.color_panel = ColorDisplayPanel(self, skein)
@@ -125,10 +156,10 @@ class ColorPanel(wx.Panel):
         self.SetMaxSize(wx.Size(50, 50))
 
         # Bind events
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_PAINT, self.on_paint)
         self.Bind(wx.EVT_LEFT_DOWN, self.on_click)
 
-    def OnPaint(self, event):
+    def on_paint(self, event):
         dc = wx.PaintDC(self)
         # Get the size of the panel
         width, height = self.GetSize()
@@ -347,17 +378,23 @@ class Window(wx.Frame):
 
         self.SetMenuBar(menubar)
 
+        # Add skein counter above search bar
+        self.skein_counter = wx.StaticText(self.panel, label="")
+        font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.skein_counter.SetFont(font)
+        main_sizer.Add(self.skein_counter, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
         self.search_bar = wx.SearchCtrl(self.panel)
         self.search_bar.SetHint("Search by SKU or name...")
         self.search_bar.Bind(wx.EVT_SEARCH, self.search)
-        main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         # Create scroll area for skeins grid
         self.scroll = wx.ScrolledWindow(self.panel)
-        self.scroll.SetScrollRate(10, 10)
+        self.scroll.SetScrollRate(30, 100)
 
-        # Create grid sizer for skeins
-        self.grid_sizer = wx.GridSizer(rows=0, cols=5, hgap=10, vgap=10)
+        # Create wrap sizer for dynamic tiling of skeins
+        self.grid_sizer = wx.WrapSizer(wx.HORIZONTAL)
 
         # Set up the scroll area
         self.scroll.SetSizer(self.grid_sizer)
@@ -365,11 +402,18 @@ class Window(wx.Frame):
 
         self.panel.SetSizer(main_sizer)
 
+        # Bind resize event
+        self.Bind(wx.EVT_SIZE, self.on_resize)
+
         self.collect_visible_skeins()
         self.populate_grid()
 
         # Hack to refresh layout
-        self.SetSize(wx.Size(self.GetSize()[0], self.GetSize()[1] + 1))
+        self.SetSize(wx.Size(self.GetSize()[0] + 100, self.GetSize()[1] + 1))
+        # Allow horizontal resizing by setting only minimum height
+        self.SetMinSize(wx.Size(400, self.GetSize()[1]))
+        # Allow horizontal resizing by setting only maximum height
+        self.SetMaxSize(wx.Size(-1, self.GetSize()[1] + 1000))
 
     def populate_grid(self):
         # Clear existing widgets
@@ -392,8 +436,8 @@ class Window(wx.Frame):
             # Create skein panel with callback
             skein_panel = SkeinPanel(self.scroll, skein, count, callback=self.update_skein_count)
 
-            # Add to grid
-            self.grid_sizer.Add(skein_panel, 0, wx.EXPAND)
+            # Add to grid with spacing
+            self.grid_sizer.Add(skein_panel, 0, wx.EXPAND | wx.ALL, 5)
 
         # Update layout
         self.grid_sizer.Layout()
@@ -405,12 +449,22 @@ class Window(wx.Frame):
     def collect_visible_skeins(self):
         # Collect all visible skeins
         self.visible_skeins = []
+
+        # Variables to track skein counts
+        total_skeins = 0
+        unique_skeins = 0
+
         for brand, brand_skeins in self.catalog.skeins.items():
             for sku, skein in brand_skeins.items():
                 # Check if we should show this skein
                 count = 0
                 if brand in self.library and sku in self.library[brand]:
                     count = self.library[brand][sku]
+
+                # Count total skeins and unique skeins
+                if count > 0:
+                    total_skeins += count
+                    unique_skeins += 1
 
                 if not self.show_all and count == 0:
                     continue  # Skip skeins not in library if toggle is off
@@ -424,6 +478,10 @@ class Window(wx.Frame):
 
                 # Add to visible skeins
                 self.visible_skeins.append((brand, sku, skein, count))
+
+        # Update the skein counter text
+        counter_text = f"Total Skeins: {total_skeins} | Unique Skeins: {unique_skeins}"
+        self.skein_counter.SetLabel(counter_text)
 
     def sort_skeins(self, event):
         id = event.GetId()
@@ -453,6 +511,7 @@ class Window(wx.Frame):
 
     def search(self, event):
         self.search_text = event.GetString()
+        self.collect_visible_skeins()
         self.populate_grid()
 
     def add_skein(self, event):
@@ -468,3 +527,14 @@ class Window(wx.Frame):
         if brand not in self.library:
             self.library[brand] = {}
         self.library[brand][sku] = count
+
+        # Update the skein counter to reflect the new count
+        self.collect_visible_skeins()
+
+    def on_resize(self, event):
+        # Allow the event to propagate
+        event.Skip()
+
+        # Recalculate the layout
+        self.grid_sizer.Layout()
+        self.scroll.FitInside()
