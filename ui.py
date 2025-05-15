@@ -9,7 +9,7 @@ class ColorDisplayPanel(wx.Panel):
     def __init__(self, parent, skein):
         super().__init__(parent, size=wx.Size(100, 100))
         self.skein = skein
-        self.SetMinSize(wx.Size(100, 300))
+        self.SetMinSize(wx.Size(100, 400))
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.average_lightness = self.calculate_average_lightness(self.skein.color)
 
@@ -43,7 +43,7 @@ class ColorDisplayPanel(wx.Panel):
             for i, color in enumerate(colors):
                 r, g, b = color
                 dc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
-                dc.DrawRectangle(int(i * band_width), 0, int(band_width), height)
+                dc.DrawRectangle(int(i * band_width), 0, int(band_width) + 1, height)
 
         # Create a transparent DC for drawing text
         gc = wx.GraphicsContext.Create(dc)
@@ -55,22 +55,57 @@ class ColorDisplayPanel(wx.Panel):
             font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
             gc.SetFont(font, text_color)
 
-            skein_title = f"{self.skein.brand.upper()} {self.skein.sku}"
+            # Get line height and handle multiline text for brand title
+            brand_lines = self.skein.brand.upper().split()
+            line_spacing = 2  # spacing between lines within the same text block
+            title_height = 0
+            max_title_width = 0
+            for line in brand_lines:
+                w, h = gc.GetTextExtent(line)
+                title_height += h + line_spacing
+                max_title_width = max(max_title_width, w)
+            title_height -= line_spacing  # remove extra spacing after last line
 
-            # Calculate text position (centered)
-            text_width, text_height = gc.GetTextExtent(skein_title)
-            text_x = (width - text_width) / 2
-            text_y = height / 2 - text_height
+            # Get dimensions for SKU
+            sku_width, sku_height = gc.GetTextExtent(self.skein.sku)
 
-            # Draw text
-            gc.DrawText(skein_title, text_x, text_y)
+            # Handle multiline name text
+            name_lines = self.skein.name.split()
+            name_height = 0
+            max_name_width = 0
+            for line in name_lines:
+                w, h = gc.GetTextExtent(line)
+                name_height += h + line_spacing
+                max_name_width = max(max_name_width, w)
+            name_height -= line_spacing  # remove extra spacing after last line
 
-            # Draw second line (name)
-            text_width, text_height = gc.GetTextExtent(self.skein.name)
-            text_x = (width - text_width) / 2
-            text_y = height / 2 + 5
+            # Calculate total text height including spacing between blocks
+            block_spacing = 10  # pixels between different text blocks
+            total_text_height = title_height + sku_height + name_height + (2 * block_spacing)
 
-            gc.DrawText(self.skein.name, text_x, text_y)
+            # Calculate starting Y position to center all elements vertically
+            start_y = (height - total_text_height) / 2
+
+            # Draw brand title (multiline)
+            current_y = start_y
+            for line in brand_lines:
+                w, h = gc.GetTextExtent(line)
+                text_x = (width - w) / 2
+                gc.DrawText(line, text_x, current_y)
+                current_y += h + line_spacing
+
+            # Draw SKU
+            sku_x = (width - sku_width) / 2
+            sku_y = start_y + title_height + block_spacing
+            gc.DrawText(self.skein.sku, sku_x, sku_y)
+
+            # Draw name (multiline)
+            current_y = sku_y + sku_height + block_spacing
+            for line in name_lines:
+                w, h = gc.GetTextExtent(line)
+                text_x = (width - w) / 2
+                gc.DrawText(line, text_x, current_y)
+                current_y += h + line_spacing
 
     @staticmethod
     def calculate_average_lightness(colors):
@@ -430,13 +465,17 @@ class Window(wx.Frame):
         main_sizer.Add(self.skein_counter, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
         self.search_bar = wx.SearchCtrl(self.panel)
+        self.search_bar.ShowCancelButton(True)
+        self.search_bar.ShowSearchButton(True)
         self.search_bar.SetHint("Search by SKU or name...")
         self.search_bar.Bind(wx.EVT_SEARCH, self.search)
+        self.search_bar.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.search)
+
         main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         # Create scroll area for skeins grid
         self.scroll = wx.ScrolledWindow(self.panel)
-        self.scroll.SetScrollRate(30, 100)
+        self.scroll.SetScrollRate(100, 200)
 
         # Create wrap sizer for dynamic tiling of skeins
         self.grid_sizer = wx.WrapSizer(wx.HORIZONTAL)
@@ -556,6 +595,8 @@ class Window(wx.Frame):
 
     def search(self, event):
         self.search_text = event.GetString()
+        if not self.search_text:
+            self.search_bar.SetValue('')
         self.collect_visible_skeins()
         self.populate_grid()
 
