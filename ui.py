@@ -88,19 +88,22 @@ class ColorDisplayPanel(wx.Panel):
 
 
 class SkeinPanel(wx.Panel):
-    def __init__(self, parent, skein, count=0, callback=None):
+    EDIT_SKEIN = None
+    COUNT_CHANGED = None
+
+    def __init__(self, parent, skein, count=0):
         super().__init__(parent, size=wx.Size(150, 200))
         self.skein = skein
         self.count = count
         self.brand = skein.brand
         self.sku = skein.sku
-        self.callback = callback
         self.SetMinSize(wx.Size(150, 200))
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Add color display panel
         self.color_panel = ColorDisplayPanel(self, skein)
+        self.color_panel.Bind(wx.EVT_LEFT_DOWN, self.on_click)
         sizer.Add(self.color_panel, 1, wx.EXPAND | wx.ALL, 5)
 
         # Add spinbox at the bottom
@@ -123,14 +126,18 @@ class SkeinPanel(wx.Panel):
 
         self.SetSizer(sizer)
 
+    def on_click(self, event):
+        print(f"{self.skein.name} clicked")
+        self.EDIT_SKEIN(self.skein)
+
     def _decrease_value(self, event):
         current = int(self.value_text.GetValue())
         if current > 0:
             new_value = current - 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.callback:
-                self.callback(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGED:
+                self.COUNT_CHANGED(self.brand, self.sku, new_value)
 
     def _increase_value(self, event):
         current = int(self.value_text.GetValue())
@@ -138,14 +145,14 @@ class SkeinPanel(wx.Panel):
             new_value = current + 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.callback:
-                self.callback(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGED:
+                self.COUNT_CHANGED(self.brand, self.sku, new_value)
 
     def _set_value(self, event):
         new_value = int(self.value_text.GetValue())
         self.count = new_value
-        if self.callback:
-            self.callback(self.brand, self.sku, new_value)
+        if self.COUNT_CHANGED:
+            self.COUNT_CHANGED(self.brand, self.sku, new_value)
 
 
 class ColorPanel(wx.Panel):
@@ -154,14 +161,19 @@ class ColorPanel(wx.Panel):
         self.color = list(wx.Colour(color).Get())
         self.SetMinSize(wx.Size(50, 50))
         self.SetMaxSize(wx.Size(50, 50))
+        self.picking = False
+
+        # Create timer for screen color sampling
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_timer)
 
         # Bind events
         self.Bind(wx.EVT_PAINT, self.on_paint)
-        self.Bind(wx.EVT_LEFT_DOWN, self.on_click)
+        self.Bind(wx.EVT_LEFT_DOWN, self.start_picking)
+        self.Bind(wx.EVT_LEFT_UP, self.stop_picking)
 
     def on_paint(self, event):
         dc = wx.PaintDC(self)
-        # Get the size of the panel
         width, height = self.GetSize()
 
         # Draw border
@@ -172,18 +184,48 @@ class ColorPanel(wx.Panel):
         # Fill with color
         dc.SetBrush(wx.Brush(wx.Colour(*self.color)))
         dc.SetPen(wx.TRANSPARENT_PEN)
-        dc.DrawRectangle(1, 1, width-2, height-2)
+        dc.DrawRectangle(1, 1, width - 2, height - 2)
 
-    def on_click(self, event):
-        color_data = wx.ColourData()
-        color_data.SetColour(wx.Colour(*self.color))
-        dlg = wx.ColourDialog(self, color_data)
+    def start_picking(self, event):
+        if not self.picking:
+            self.picking = True
+            self.SetCursor(wx.Cursor(wx.CURSOR_CROSS))
+            # Capture mouse and keyboard events globally
+            self.CaptureMouse()
+            self.Bind(wx.EVT_LEFT_DOWN, self.stop_picking)
+            self.Bind(wx.EVT_RIGHT_DOWN, self.stop_picking)
+            # Start timer for color sampling
+            self.timer.Start(50)  # Update every 50ms
 
-        if dlg.ShowModal() == wx.ID_OK:
-            self.color = list(dlg.GetColourData().GetColour().Get())
+        event.Skip()
+
+    def on_timer(self, event):
+        if self.picking:
+            # Get screen position
+            x, y = wx.GetMousePosition()
+
+            # Get color at current position
+            dc = wx.ScreenDC()
+            color = dc.GetPixel(x, y)
+
+            # Update preview
+            self.color = list(color.Get())
             self.Refresh()
 
-        dlg.Destroy()
+    def stop_picking(self, event):
+        if self.picking:
+            self.picking = False
+            self.SetCursor(wx.NullCursor)
+
+            if self.HasCapture():
+                self.ReleaseMouse()
+
+            wx.GetTopLevelParent(self).Unbind(wx.EVT_KEY_DOWN)
+            self.Unbind(wx.EVT_LEFT_DOWN)
+            self.Unbind(wx.EVT_RIGHT_DOWN)
+
+            self.timer.Stop()
+        event.Skip()
 
 
 class AddSkeinDialog(wx.Dialog):
@@ -374,6 +416,9 @@ class Window(wx.Frame):
         self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_name_item)
         self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_count)
 
+        SkeinPanel.COUNT_CHANGE = self.update_skein_count
+        SkeinPanel.EDIT_SKEIN = self.edit_skein
+
         menubar.Append(sort_menu, "&Sort")
 
         self.SetMenuBar(menubar)
@@ -434,7 +479,7 @@ class Window(wx.Frame):
         # Add sorted skeins to the grid
         for brand, sku, skein, count in self.visible_skeins:
             # Create skein panel with callback
-            skein_panel = SkeinPanel(self.scroll, skein, count, callback=self.update_skein_count)
+            skein_panel = SkeinPanel(self.scroll, skein, count)
 
             # Add to grid with spacing
             self.grid_sizer.Add(skein_panel, 0, wx.EXPAND | wx.ALL, 5)
@@ -521,6 +566,25 @@ class Window(wx.Frame):
                 wx.MessageBox("Skein added successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
                 self.collect_visible_skeins()
                 self.populate_grid()
+        dialog.Destroy()
+
+    def edit_skein(self, skein: Skein):
+        dialog = AddSkeinDialog(self, self.catalog)
+        dialog.brand_input.SetValue(skein.brand.upper())
+        dialog.name_input.SetValue(skein.name)
+        dialog.sku_input.SetValue(skein.sku)
+
+        dialog.color_panels[0].color = skein.color[0]
+        for color in skein.color[1:]:
+            dialog.add_color(event=None)
+            dialog.color_panels[-1].color = color
+
+        if dialog.ShowModal() == wx.ID_OK:
+            if dialog.save_skein():
+                wx.MessageBox("Skein edited successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
+                self.collect_visible_skeins()
+                self.populate_grid()
+
         dialog.Destroy()
 
     def update_skein_count(self, brand, sku, count):
