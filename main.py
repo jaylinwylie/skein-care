@@ -4,34 +4,34 @@ import json
 import wx
 
 from skein import Catalog
-from ui import Window
-
+import ui
 
 app = wx.App()
 library: dict[str, dict[str, int]] = {}
 catalog = Catalog()
 
-print("Loading catalogs...")
+print("Loading catalogs")
 catalogs_dir = "catalogs"
 if not os.path.exists(catalogs_dir):
     os.makedirs(catalogs_dir)
 for filename in os.listdir(catalogs_dir):
     if filename.endswith(".json") and not filename.startswith("_"):
         brand = os.path.splitext(filename)[0]
-
         try:
+            print(f"Loading catalog {filename}")
             with open(os.path.join(catalogs_dir, filename)) as f:
                 data = json.load(f)
             catalog.load_brand(brand, data)
         except Exception as e:
             print(f"Error loading catalog {filename}: {e}")
 
-print("Loading library...")
 library_file = "library.json"
 if os.path.exists(library_file):
     try:
+        print("Loading library")
         with open(library_file, 'r') as f1:
             library = json.load(f1)
+        print("Library loaded successfully.")
     except Exception as e:
         print(f"Error loading library: {e}")
 else:
@@ -40,16 +40,16 @@ else:
     with open(library_file, 'w') as f2:
         json.dump(library, f2, indent=4) 
 
-print("Creating main window...")
-window = Window(library, catalog)
+print("Creating main window")
+window = ui.Window(library, catalog)
 
 window.Show()
 app.SetTopWindow(window)
 
-print("Starting main loop...")
+print("Starting main loop")
 exit_code = app.MainLoop()
 
-print("Saving library...")
+print("Saving library")
 library_file = "library.json"
 try:
     with open(library_file, 'w') as f:
@@ -57,5 +57,5 @@ try:
 except Exception as e:
     print(f"Error saving library: {e}")
 
-print("Exiting...")
+print("Exiting")
 sys.exit(exit_code)
