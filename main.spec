@@ -1,5 +1,5 @@
-# -*- mode: python ; coding: utf-8 -*-
 
+# -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
     ['main.py'],
@@ -12,15 +12,15 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries,
+    a.datas,
     name='Skein Care',
     icon='thread.png',
     debug=False,
@@ -33,13 +33,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='Skein Care',
 )
