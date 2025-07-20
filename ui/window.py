@@ -1,9 +1,11 @@
 import wx
 import wx.grid
+import wx.adv
 import json
 import os
 from skein import Skein
 from model import SkeinModel
+from about import ABOUT_TXT
 
 
 class ColorDisplayPanel(wx.Panel):
@@ -454,6 +456,12 @@ class Window(wx.Frame):
 
         menubar.Append(sort_menu, "&Sort")
 
+        # Add Help menu with About item
+        help_menu = wx.Menu()
+        about_item = help_menu.Append(wx.ID_ABOUT, "&About")
+        self.Bind(wx.EVT_MENU, self.on_about, about_item)
+        menubar.Append(help_menu, "&Help")
+
         self.SetMenuBar(menubar)
         self.CreateStatusBar()
         # Add skein counter above search bar
@@ -623,6 +631,13 @@ class Window(wx.Frame):
         # Recalculate the layout
         self.grid_sizer.Layout()
         self.scroll.FitInside()
+
+    def on_about(self, event):
+        """Display the about dialog when the About menu item is clicked."""
+        info = wx.adv.AboutDialogInfo()
+        info.SetName("Skein Care")
+        info.SetDescription(ABOUT_TXT)
+        wx.adv.AboutBox(info)
 
     def on_close(self, event):
         self.defaults.update({
