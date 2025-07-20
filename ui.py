@@ -124,7 +124,7 @@ class ColorDisplayPanel(wx.Panel):
 
 class SkeinPanel(wx.Panel):
     EDIT_SKEIN = None
-    COUNT_CHANGED = None
+    COUNT_CHANGE = None
 
     def __init__(self, parent, skein, count=0):
         super().__init__(parent, size=wx.Size(150, 200))
@@ -171,8 +171,8 @@ class SkeinPanel(wx.Panel):
             new_value = current - 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.COUNT_CHANGED:
-                self.COUNT_CHANGED(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGE:
+                self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
     def _increase_value(self, event):
         current = int(self.value_text.GetValue())
@@ -180,14 +180,14 @@ class SkeinPanel(wx.Panel):
             new_value = current + 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.COUNT_CHANGED:
-                self.COUNT_CHANGED(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGE:
+                self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
     def _set_value(self, event):
         new_value = int(self.value_text.GetValue())
         self.count = new_value
-        if self.COUNT_CHANGED:
-            self.COUNT_CHANGED(self.brand, self.sku, new_value)
+        if self.COUNT_CHANGE:
+            self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
 
 class ColorPanel(wx.Panel):
@@ -356,7 +356,7 @@ class AddSkeinDialog(wx.Dialog):
             colors.append([selected_color[0], selected_color[1], selected_color[2]])
 
         data = {
-            "brand": self.brand_input.GetValue(),
+            "brand": self.brand_input.GetValue().lower(),
             "sku": self.sku_input.GetValue(),
             "name": self.name_input.GetValue(),
             "color": colors
@@ -441,15 +441,18 @@ class Window(wx.Frame):
         menubar.Append(file_menu, "&File")
 
         sort_menu = wx.Menu()
-        sort_by_brand_item = sort_menu.Append(0, "Brand")
-        sort_by_sku_item = sort_menu.Append(1, "SKU")
-        sort_by_name_item = sort_menu.Append(2, "Name")
-        sort_by_count = sort_menu.Append(3, "Count")
+        self.sort_by_brand_item = sort_menu.AppendCheckItem(0, "Brand")
+        self.sort_by_sku_item = sort_menu.AppendCheckItem(1, "SKU")
+        self.sort_by_name_item = sort_menu.AppendCheckItem(2, "Name")
+        self.sort_by_count_item = sort_menu.AppendCheckItem(3, "Count")
 
-        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_brand_item)
-        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_sku_item)
-        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_name_item)
-        self.Bind(wx.EVT_MENU, self.sort_skeins, sort_by_count)
+        # Set the default sort method checkmark
+        self.sort_by_count_item.Check(True)
+
+        self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_brand_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_sku_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_name_item)
+        self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_count_item)
 
         SkeinPanel.COUNT_CHANGE = self.update_skein_count
         SkeinPanel.EDIT_SKEIN = self.edit_skein
@@ -457,7 +460,7 @@ class Window(wx.Frame):
         menubar.Append(sort_menu, "&Sort")
 
         self.SetMenuBar(menubar)
-
+        self.CreateStatusBar()
         # Add skein counter above search bar
         self.skein_counter = wx.StaticText(self.panel, label="")
         font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
@@ -571,14 +574,24 @@ class Window(wx.Frame):
         id = event.GetId()
         # Brand, Sku, Name, Count
 
+        # Uncheck all sort menu items
+        self.sort_by_brand_item.Check(False)
+        self.sort_by_sku_item.Check(False)
+        self.sort_by_name_item.Check(False)
+        self.sort_by_count_item.Check(False)
+
         if id == 0:
             self.sort_method = 0  # Sort by brand
+            self.sort_by_brand_item.Check(True)
         elif id == 1:
             self.sort_method = 1  # Sort by SKU
+            self.sort_by_sku_item.Check(True)
         elif id == 2:
             self.sort_method = 2  # Sort by name
+            self.sort_by_name_item.Check(True)
         elif id == 3:
             self.sort_method = 3  # Sort by count
+            self.sort_by_count_item.Check(True)
         else:
             raise ValueError("Invalid sort id.")
 
@@ -623,16 +636,17 @@ class Window(wx.Frame):
         if dialog.ShowModal() == wx.ID_OK:
             if dialog.save_skein():
                 wx.MessageBox("Skein edited successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
-                self.collect_visible_skeins()
                 self.populate_grid()
+                self.collect_visible_skeins()
 
         dialog.Destroy()
 
     def update_skein_count(self, brand, sku, count):
+        print(f"Updated skein count for {brand} - {sku} to {count}")
+        self.SetStatusText(f"Updated skein count for {brand} - {sku} to {count}")
         if brand not in self.library:
             self.library[brand] = {}
         self.library[brand][sku] = count
-
         # Update the skein counter to reflect the new count
         self.collect_visible_skeins()
 
