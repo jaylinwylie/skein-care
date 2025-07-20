@@ -3,6 +3,7 @@ import wx.grid
 import json
 import os
 from skein import Skein
+from model import SkeinModel
 
 
 class ColorDisplayPanel(wx.Panel):
@@ -264,10 +265,10 @@ class ColorPanel(wx.Panel):
 
 
 class AddSkeinDialog(wx.Dialog):
-    def __init__(self, parent, catalog):
+    def __init__(self, parent, model):
         super().__init__(parent, title="Add New Skein")
         self.color_panels: list[ColorPanel] = []
-        self.catalog = catalog
+        self.model = model
 
         # Create the main sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -396,27 +397,19 @@ class AddSkeinDialog(wx.Dialog):
             wx.MessageBox(f"Error saving brand file: {e}", "Error", wx.OK | wx.ICON_ERROR)
             return False
 
-        # Add to catalog
-        if brand not in self.catalog.skeins:
-            self.catalog.skeins[brand] = {}
-
+        # Create skein and add to model
         skein = Skein(brand, sku)
         skein.name = data["name"]
         skein.color = data["color"]
-        self.catalog.skeins[brand][sku] = skein
+        self.model.add_skein_to_catalog(skein)
 
         return True
 
 
 class Window(wx.Frame):
-    def __init__(self, library, catalog, parent=None):
+    def __init__(self, model, parent=None):
         super().__init__(parent, title="Skein Care", size=wx.Size(800, 600))
-        self.visible_skeins = None
-        self.library = library
-        self.catalog = catalog
-        self.show_all = True  # Default to showing all skeins
-        self.search_text = ""  # Initialize empty search text
-        self.sort_method = 3  # Default sort by count
+        self.model = model
 
         # Create the main panel and sizer
         self.panel = wx.Panel(self)
@@ -506,20 +499,14 @@ class Window(wx.Frame):
         # Clear existing widgets
         self.grid_sizer.Clear(True)
 
-        if self.sort_method == 0:  # Sort by brand
-            self.visible_skeins.sort(key=lambda x: x[0].lower())  # Sort by brand (case-insensitive)
-        elif self.sort_method == 1:  # Sort by SKU
-            self.visible_skeins.sort(key=lambda x: int(x[1]) if x[1].isdecimal() else -1)  # Sort by SKU (case-insensitive)
-        elif self.sort_method == 2:  # Sort by name
-            self.visible_skeins.sort(key=lambda x: x[2].name.lower())  # Sort by name (case-insensitive)
-        elif self.sort_method == 3:  # Sort by count
-            self.visible_skeins.sort(key=lambda x: x[3], reverse=True)  # Sort by count (descending)
+        # Sort the visible skeins using the model
+        self.model.sort_visible_skeins()
 
         # Freeze the window to prevent flickering
         self.scroll.Freeze()
 
         # Add sorted skeins to the grid
-        for brand, sku, skein, count in self.visible_skeins:
+        for brand, sku, skein, count in self.model.visible_skeins:
             # Create skein panel with callback
             skein_panel = SkeinPanel(self.scroll, skein, count)
 
@@ -534,37 +521,8 @@ class Window(wx.Frame):
         self.scroll.Thaw()
 
     def collect_visible_skeins(self):
-        # Collect all visible skeins
-        self.visible_skeins = []
-
-        # Variables to track skein counts
-        total_skeins = 0
-        unique_skeins = 0
-
-        for brand, brand_skeins in self.catalog.skeins.items():
-            for sku, skein in brand_skeins.items():
-                # Check if we should show this skein
-                count = 0
-                if brand in self.library and sku in self.library[brand]:
-                    count = self.library[brand][sku]
-
-                # Count total skeins and unique skeins
-                if count > 0:
-                    total_skeins += count
-                    unique_skeins += 1
-
-                if not self.show_all and count == 0:
-                    continue  # Skip skeins not in library if toggle is off
-
-                # Check if skein matches search criteria
-                if self.search_text and not (
-                        self.search_text.lower() in sku.lower() or
-                        self.search_text.lower() in skein.name.lower()
-                ):
-                    continue  # Skip if doesn't match search
-
-                # Add to visible skeins
-                self.visible_skeins.append((brand, sku, skein, count))
+        # Use the model to collect visible skeins
+        total_skeins, unique_skeins = self.model.collect_visible_skeins()
 
         # Update the skein counter text
         counter_text = f"Total Skeins: {total_skeins} | Unique Skeins: {unique_skeins}"
@@ -581,40 +539,46 @@ class Window(wx.Frame):
         self.sort_by_count_item.Check(False)
 
         if id == 0:
-            self.sort_method = 0  # Sort by brand
+            sort_method = 0  # Sort by brand
             self.sort_by_brand_item.Check(True)
         elif id == 1:
-            self.sort_method = 1  # Sort by SKU
+            sort_method = 1  # Sort by SKU
             self.sort_by_sku_item.Check(True)
         elif id == 2:
-            self.sort_method = 2  # Sort by name
+            sort_method = 2  # Sort by name
             self.sort_by_name_item.Check(True)
         elif id == 3:
-            self.sort_method = 3  # Sort by count
+            sort_method = 3  # Sort by count
             self.sort_by_count_item.Check(True)
         else:
             raise ValueError("Invalid sort id.")
 
+        # Update the sort method in the model
+        self.model.set_sort_method(sort_method)
         self.populate_grid()
 
     def toggle_skeins_visibility(self, event):
-        self.show_all = event.IsChecked()
-        if self.show_all:
+        show_all = event.IsChecked()
+        if show_all:
             self.toggle_item.SetItemLabel("Show All Skeins")
         else:
             self.toggle_item.SetItemLabel("Show Library Only")
+        # Update the visibility in the model
+        self.model.toggle_skeins_visibility(show_all)
         self.collect_visible_skeins()
         self.populate_grid()
 
     def search(self, event):
-        self.search_text = event.GetString()
-        if not self.search_text:
+        search_text = event.GetString()
+        if not search_text:
             self.search_bar.SetValue('')
+        # Update the search text in the model
+        self.model.search(search_text)
         self.collect_visible_skeins()
         self.populate_grid()
 
     def add_skein(self, event):
-        dialog = AddSkeinDialog(self, self.catalog)
+        dialog = AddSkeinDialog(self, self.model)
         if dialog.ShowModal() == wx.ID_OK:
             if dialog.save_skein():
                 wx.MessageBox("Skein added successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
@@ -623,7 +587,7 @@ class Window(wx.Frame):
         dialog.Destroy()
 
     def edit_skein(self, skein: Skein):
-        dialog = AddSkeinDialog(self, self.catalog)
+        dialog = AddSkeinDialog(self, self.model)
         dialog.brand_input.SetValue(skein.brand.upper())
         dialog.name_input.SetValue(skein.name)
         dialog.sku_input.SetValue(skein.sku)
@@ -644,9 +608,8 @@ class Window(wx.Frame):
     def update_skein_count(self, brand, sku, count):
         print(f"Updated skein count for {brand} - {sku} to {count}")
         self.SetStatusText(f"Updated skein count for {brand} - {sku} to {count}")
-        if brand not in self.library:
-            self.library[brand] = {}
-        self.library[brand][sku] = count
+        # Update the count in the model
+        self.model.update_skein_count(brand, sku, count)
         # Update the skein counter to reflect the new count
         self.collect_visible_skeins()
 

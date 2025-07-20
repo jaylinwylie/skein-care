@@ -5,6 +5,7 @@ import wx
 
 from skein import Catalog
 from ui import Window
+from model import SkeinModel
 
 
 app = wx.App()
@@ -15,6 +16,7 @@ print("Loading catalogs...")
 catalogs_dir = "catalogs"
 if not os.path.exists(catalogs_dir):
     os.makedirs(catalogs_dir)
+
 for filename in os.listdir(catalogs_dir):
     if filename.endswith(".json") and not filename.startswith("_"):
         brand = os.path.splitext(filename)[0]
@@ -40,12 +42,13 @@ else:
     with open(library_file, 'w') as f2:
         json.dump(library, f2, indent=4) 
 
-print("Creating main window...")
-window = Window(library, catalog)
+print("Creating model...")
+model = SkeinModel(library, catalog)
 
+print("Creating main window...")
+window = Window(model)
 window.Show()
 app.SetTopWindow(window)
-
 print("Starting main loop...")
 exit_code = app.MainLoop()
 
