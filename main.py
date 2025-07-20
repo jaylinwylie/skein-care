@@ -40,23 +40,48 @@ else:
     print("Library file not found, creating new library.")
     library = {}
     with open(library_file, 'w') as f2:
-        json.dump(library, f2, indent=4) 
+        json.dump(library, f2, indent=4)
+
+print("Loading defaults...")
+defaults = {}
+defaults_file = "defaults.json"
+if os.path.exists(defaults_file):
+    try:
+        with open(defaults_file, 'r') as f:
+            defaults = json.load(f)
+    except Exception as e:
+        print(f"Error loading defaults: {e}")
+else:
+    print("Defaults file not found, creating new defaults.")
+    with open(defaults_file, 'w') as f:
+        json.dump(defaults or {}, f, indent=4)
 
 print("Creating model...")
 model = SkeinModel(library, catalog)
 
 print("Creating main window...")
-window = Window(model)
+window = Window(model, defaults)
 window.Show()
 app.SetTopWindow(window)
 print("Starting main loop...")
 exit_code = app.MainLoop()
+print("...Main loop ended.")
+print("Saving defaults...")
 
-print("Saving library...")
-library_file = "library.json"
 try:
+    print("Saving defaults...")
+    with open(defaults_file, 'w') as f:
+        json.dump(defaults, f, indent=4)
+    print("Defaults saved.")
+except Exception as e:
+    print(f"Error saving defaults: {e}")
+
+
+try:
+    print("Saving library...")
     with open(library_file, 'w') as f:
         json.dump(library, f, indent=4)
+    print("Library saved.")
 except Exception as e:
     print(f"Error saving library: {e}")
 

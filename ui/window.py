@@ -407,26 +407,21 @@ class AddSkeinDialog(wx.Dialog):
 
 
 class Window(wx.Frame):
-    def __init__(self, model, parent=None):
-        super().__init__(parent, title="Skein Care", size=wx.Size(800, 600))
+    def __init__(self, model, defaults: dict = None):
+        super().__init__(parent=None, title="Skein Care", size=wx.Size(*(defaults.get('window_size', (800, 600)))))
         self.model = model
+        self.model.sort_method = defaults.get('sort_method', 3)
+        self.defaults = defaults
 
-        # Create the main panel and sizer
+        self.SetPosition(wx.Point(*(defaults.get('window_position', (400, 300)))))
         self.panel = wx.Panel(self)
         main_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Create a menu bar
         menubar = wx.MenuBar()
         file_menu = wx.Menu()
-
-        # Add "Add New Skein" menu item
         add_skein_item = file_menu.Append(wx.ID_ANY, "Add New Skein")
         self.Bind(wx.EVT_MENU, self.add_skein, add_skein_item)
-
-        # Add separator
         file_menu.AppendSeparator()
 
-        # Add toggle for showing/hiding skeins not in library
         self.toggle_item = file_menu.AppendCheckItem(wx.ID_ANY, "Show All Skeins")
         self.toggle_item.Check(True)
         self.Bind(wx.EVT_MENU, self.toggle_skeins_visibility, self.toggle_item)
@@ -439,8 +434,15 @@ class Window(wx.Frame):
         self.sort_by_name_item = sort_menu.AppendCheckItem(2, "Name")
         self.sort_by_count_item = sort_menu.AppendCheckItem(3, "Count")
 
-        # Set the default sort method checkmark
-        self.sort_by_count_item.Check(True)
+        if self.model.sort_method == 0:
+            self.sort_by_brand_item.Check()
+        elif self.model.sort_method == 1:
+            self.sort_by_sku_item.Check()
+        elif self.model.sort_method == 2:
+            self.sort_by_name_item.Check()
+        else:
+            self.sort_by_count_item.Check()
+
 
         self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_brand_item)
         self.Bind(wx.EVT_MENU, self.sort_skeins, self.sort_by_sku_item)
@@ -456,9 +458,9 @@ class Window(wx.Frame):
         self.CreateStatusBar()
         # Add skein counter above search bar
         self.skein_counter = wx.StaticText(self.panel, label="")
-        font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
         self.skein_counter.SetFont(font)
-        main_sizer.Add(self.skein_counter, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        main_sizer.Add(self.skein_counter, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 20)
 
         self.search_bar = wx.SearchCtrl(self.panel)
         self.search_bar.ShowCancelButton(True)
@@ -467,7 +469,7 @@ class Window(wx.Frame):
         self.search_bar.Bind(wx.EVT_SEARCH, self.search)
         self.search_bar.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.search)
 
-        main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 20)
 
         # Create scroll area for skeins grid
         self.scroll = wx.ScrolledWindow(self.panel)
@@ -484,16 +486,17 @@ class Window(wx.Frame):
 
         # Bind resize event
         self.Bind(wx.EVT_SIZE, self.on_resize)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         self.collect_visible_skeins()
         self.populate_grid()
 
         # Hack to refresh layout
-        self.SetSize(wx.Size(self.GetSize()[0] + 100, self.GetSize()[1] + 1))
-        # Allow horizontal resizing by setting only minimum height
-        self.SetMinSize(wx.Size(400, self.GetSize()[1]))
-        # Allow horizontal resizing by setting only maximum height
-        self.SetMaxSize(wx.Size(-1, self.GetSize()[1] + 1000))
+        # self.SetSize(wx.Size(self.GetSize()[0] + 100, self.GetSize()[1] + 1))
+        start_size = self.GetSize()
+        self.SetSize((start_size[0], start_size[1] + 1))
+        self.SetSize(start_size)
+        self.SetMinSize(wx.Size(400, 400))
 
     def populate_grid(self):
         # Clear existing widgets
@@ -620,3 +623,11 @@ class Window(wx.Frame):
         # Recalculate the layout
         self.grid_sizer.Layout()
         self.scroll.FitInside()
+
+    def on_close(self, event):
+        self.defaults.update({
+                "window_size": (self.GetSize().x, self.GetSize().y),
+                "window_position": (self.GetPosition().x, self.GetPosition().y),
+                "sort_method": self.model.sort_method
+        })
+        event.Skip()
