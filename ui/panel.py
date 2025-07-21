@@ -128,7 +128,7 @@ class ColorDisplayPanel(wx.Panel):
 
 class SkeinPanel(wx.Panel):
     EDIT_SKEIN = None
-    COUNT_CHANGED = None
+    COUNT_CHANGE = None
 
     def __init__(self, parent, skein, count=0):
         print(f'Making Panel for {skein.name}')
@@ -181,8 +181,8 @@ class SkeinPanel(wx.Panel):
             new_value = current - 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.COUNT_CHANGED:
-                self.COUNT_CHANGED(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGE:
+                self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
     def _increase_value(self, event):
         current = int(self.value_text.GetValue())
@@ -190,14 +190,14 @@ class SkeinPanel(wx.Panel):
             new_value = current + 1
             self.value_text.SetValue(str(new_value))
             self.count = new_value
-            if self.COUNT_CHANGED:
-                self.COUNT_CHANGED(self.brand, self.sku, new_value)
+            if self.COUNT_CHANGE:
+                self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
     def _set_value(self, event):
         new_value = int(self.value_text.GetValue())
         self.count = new_value
-        if self.COUNT_CHANGED:
-            self.COUNT_CHANGED(self.brand, self.sku, new_value)
+        if self.COUNT_CHANGE:
+            self.COUNT_CHANGE(self.brand, self.sku, new_value)
 
 
 class ColorPanel(wx.Panel):
