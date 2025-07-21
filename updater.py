@@ -81,12 +81,11 @@
 # }
 
 import requests
+VERSION = "v1.0.0"
 
 USER = "jaylinwylie"
-REPO = "sbv2txt"
-
-VERSION = "v1.0.0"
-DOWNLOAD_LINK = "https://github.com/jaylinwylie/sbv2txt/releases"
+REPO = "skein-care"
+DOWNLOAD_LINK = f"https://github.com/{USER}/{REPO}/releases"
 
 
 def to_version(tag: str) -> tuple[int, ...]:

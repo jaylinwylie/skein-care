@@ -450,7 +450,8 @@ class Window(wx.Frame):
                 else:
                     wx.MessageBox(f"You have the latest version.\n{current}", "Update Check", wx.OK | wx.ICON_INFORMATION)
         except Exception as e:
-            wx.MessageBox(f"Error checking for updates: {e}", "Error", wx.OK | wx.ICON_ERROR)
+            print(f"Error checking for updates: {e}")
+            wx.MessageBox(f"Error checking for updates", "Error", wx.OK | wx.ICON_ERROR)
 
         finally:
             self.SetStatusText("")
@@ -459,7 +460,10 @@ class Window(wx.Frame):
         """Display the about dialog when the About menu item is clicked."""
         info = wx.adv.AboutDialogInfo()
         info.SetName("Skein Care")
-        info.SetDescription("Made by Jaylin Wylie Mayes - 2025\n\t- For my wife <3\n")
+        info.SetVersion(updater.VERSION)
+        info.SetDescription("~For my wife <3\n\nConsider Donating!")
+        info.SetCopyright("(c) 2025 Jaylin Wylie Mayes")
+        info.SetLicence(LICENCE)
         info.SetWebSite(updater.DOWNLOAD_LINK)
         wx.adv.AboutBox(info)
 
@@ -512,4 +516,28 @@ Skein Care is a native desktop application designed to help catalog thread skein
 - Skein collection is saved in "library.json"
 - Skein catalogs are stored in the "catalogs" folder as JSON files
 - User preferences are saved in "defaults.json"
+"""
+
+LICENCE = """\
+MIT License
+
+Copyright (c) 2025 Jaylin Wylie Mayes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
