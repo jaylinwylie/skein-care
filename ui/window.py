@@ -159,7 +159,7 @@ class Window(wx.Frame):
     def __init__(self, skein_model, defaults: dict = None):
         self.skein_panels = {}
         import model
-        super().__init__(parent=None, title="Skein Care", size=wx.Size(*(defaults.get('window_size', (800, 600)))))
+        super().__init__(parent=None, title="Skein Care", size=wx.Size(*(defaults.get('window_size', (875, 600)))))
 
         self.model: model.SkeinModel = skein_model
         self.model.sort_method = defaults.get('sort_method', 3)
