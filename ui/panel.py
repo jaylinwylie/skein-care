@@ -171,6 +171,9 @@ class SkeinPanel(wx.Panel):
     def on_click(self, event):
         print(f"{self.skein.name} clicked")
         self.EDIT_SKEIN(self.skein)
+        self.color_panel.render_buffer = None
+        self.color_panel.Refresh()
+        event.Skip()
 
     def _decrease_value(self, event):
         current = int(self.value_text.GetValue())
