@@ -77,6 +77,7 @@ class AddSkeinDialog(wx.Dialog):
         button_sizer.AddButton(cancel_button)
         button_sizer.Realize()
 
+        main_sizer.Add(wx.StaticText(self, label='Click and drag to sample color from screen'))
         main_sizer.Add(button_sizer, 0, wx.EXPAND, 5)
 
         self.SetSizer(main_sizer)
