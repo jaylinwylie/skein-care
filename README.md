@@ -1,8 +1,27 @@
-Skein Care is a native desktop application designed to help catalog thread skeins for embroidery, cross-stitch, and other fiber arts.
+# Skein Care
 
-- Each skein has a counter that you can adjust using the + and - buttons, or by entering a value directly.
-- Sort collection by Brand, SKU, Name, or Count using the Sort menu.
-- Use the search bar to quickly find skeins by SKU or name.
+A native desktop application designed to help catalog thread skeins for embroidery, cross-stitch, and other fiber arts.
+
+## Features
+
+- Track your thread inventory with adjustable counters
+- Sort collection by Brand, SKU, Name, or Count
+- Search skeins by SKU or name
+- Pick colors directly from your screen
+
+## Installation
+
+1. Ensure you have Python installed
+2. Install required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Run the application:
+   ```
+   python main.py
+   ```
+
+## Usage
 
 ### Adding New Skeins
 1. Click on "File" > "Add New Skein"
