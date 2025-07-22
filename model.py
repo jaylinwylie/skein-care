@@ -28,6 +28,7 @@ class SkeinModel:
     def __init__(self, library, catalog):
         self.library = library
         self.catalog = catalog
+        self.sort_method = 0  # Default sort by brand
 
     def update_skein_count(self, brand, sku, count):
         if brand not in self.library:
@@ -37,8 +38,8 @@ class SkeinModel:
     def add_skein_to_catalog(self, skein):
         brand = skein.brand
         sku = skein.sku
-        
+
         if brand not in self.catalog.skeins:
             self.catalog.skeins[brand] = {}
-            
+
         self.catalog.skeins[brand][sku] = skein

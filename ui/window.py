@@ -181,16 +181,30 @@ class Window(wx.Frame):
         menubar.Append(file_menu, "&File")
 
         self.sort_menu = wx.Menu()
-        self.sort_by_brand_item = self.sort_menu.AppendCheckItem(0, "Brand")
-        self.sort_by_sku_item = self.sort_menu.AppendCheckItem(1, "SKU")
-        self.sort_by_name_item = self.sort_menu.AppendCheckItem(2, "Name")
-        self.sort_by_count_item = self.sort_menu.AppendCheckItem(3, "Count")
+        # Define sort method constants
+        self.SORT_BY_BRAND = 0
+        self.SORT_BY_SKU = 1
+        self.SORT_BY_NAME = 2
+        self.SORT_BY_COUNT = 3
 
-        if self.model.sort_method == 0:
+        # Create menu items with wx.ID_ANY and store their IDs
+        self.sort_by_brand_item = self.sort_menu.AppendCheckItem(wx.ID_ANY, "Brand")
+        self.sort_by_brand_id = self.sort_by_brand_item.GetId()
+
+        self.sort_by_sku_item = self.sort_menu.AppendCheckItem(wx.ID_ANY, "SKU")
+        self.sort_by_sku_id = self.sort_by_sku_item.GetId()
+
+        self.sort_by_name_item = self.sort_menu.AppendCheckItem(wx.ID_ANY, "Name")
+        self.sort_by_name_id = self.sort_by_name_item.GetId()
+
+        self.sort_by_count_item = self.sort_menu.AppendCheckItem(wx.ID_ANY, "Count")
+        self.sort_by_count_id = self.sort_by_count_item.GetId()
+
+        if self.model.sort_method == self.SORT_BY_BRAND:
             self.sort_by_brand_item.Check()
-        elif self.model.sort_method == 1:
+        elif self.model.sort_method == self.SORT_BY_SKU:
             self.sort_by_sku_item.Check()
-        elif self.model.sort_method == 2:
+        elif self.model.sort_method == self.SORT_BY_NAME:
             self.sort_by_name_item.Check()
         else:
             self.sort_by_count_item.Check()
@@ -274,13 +288,13 @@ class Window(wx.Frame):
         panel_list = [(key, panel) for key, panel in self.skein_panels.items()]
         # Sort the panels based on the sort method
         sort_id = self.get_sort_option(self.sort_menu)
-        if sort_id == 0:  # Sort by brand
+        if sort_id == self.sort_by_brand_id:  # Sort by brand
             panel_list.sort(key=lambda x: x[1].brand.lower())
-        elif sort_id == 1:  # Sort by SKU
+        elif sort_id == self.sort_by_sku_id:  # Sort by SKU
             panel_list.sort(key=lambda x: int(x[1].sku) if x[1].sku.isdecimal() else -1)
-        elif sort_id == 2:  # Sort by name
+        elif sort_id == self.sort_by_name_id:  # Sort by name
             panel_list.sort(key=lambda x: x[1].skein.name.lower())
-        elif sort_id == 3:  # Sort by count
+        elif sort_id == self.sort_by_count_id:  # Sort by count
             panel_list.sort(key=lambda x: x[1].count, reverse=True)
 
         # Freeze the window to prevent flickering
@@ -348,17 +362,17 @@ class Window(wx.Frame):
         self.sort_by_name_item.Check(False)
         self.sort_by_count_item.Check(False)
 
-        if id == 0:
-            sort_method = 0  # Sort by brand
+        if id == self.sort_by_brand_id:
+            self.model.sort_method = self.SORT_BY_BRAND  # Sort by brand
             self.sort_by_brand_item.Check(True)
-        elif id == 1:
-            sort_method = 1  # Sort by SKU
+        elif id == self.sort_by_sku_id:
+            self.model.sort_method = self.SORT_BY_SKU  # Sort by SKU
             self.sort_by_sku_item.Check(True)
-        elif id == 2:
-            sort_method = 2  # Sort by name
+        elif id == self.sort_by_name_id:
+            self.model.sort_method = self.SORT_BY_NAME  # Sort by name
             self.sort_by_name_item.Check(True)
-        elif id == 3:
-            sort_method = 3  # Sort by count
+        elif id == self.sort_by_count_id:
+            self.model.sort_method = self.SORT_BY_COUNT  # Sort by count
             self.sort_by_count_item.Check(True)
         else:
             raise ValueError("Invalid sort id.")
@@ -481,10 +495,22 @@ class Window(wx.Frame):
 
 
     def on_close(self, event):
+        # Convert the dynamic menu item ID to the constant sort method value
+        sort_id = self.get_sort_option(self.sort_menu)
+        sort_method = self.SORT_BY_COUNT  # Default to count
+        if sort_id == self.sort_by_brand_id:
+            sort_method = self.SORT_BY_BRAND
+        elif sort_id == self.sort_by_sku_id:
+            sort_method = self.SORT_BY_SKU
+        elif sort_id == self.sort_by_name_id:
+            sort_method = self.SORT_BY_NAME
+        elif sort_id == self.sort_by_count_id:
+            sort_method = self.SORT_BY_COUNT
+
         self.defaults.update({
                 "window_size": (self.GetSize().x, self.GetSize().y),
                 "window_position": (self.GetPosition().x, self.GetPosition().y),
-                "sort_method": self.get_sort_option(self.sort_menu)
+                "sort_method": sort_method
         })
         event.Skip()
 

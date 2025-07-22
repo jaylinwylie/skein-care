@@ -18,7 +18,6 @@ class ColorDisplayPanel(wx.Panel):
         event.Skip()
 
     def render(self):
-        print(f'Rendering {self.skein.name}')
         width, height = self.GetSize()
         self.render_buffer = wx.Bitmap(width, height)
 
@@ -131,7 +130,6 @@ class SkeinPanel(wx.Panel):
     COUNT_CHANGE = None
 
     def __init__(self, parent, skein, count=0):
-        print(f'Making Panel for {skein.name}')
         super().__init__(parent, size=wx.Size(150, 200))
         self.skein = skein
         self.count = count
