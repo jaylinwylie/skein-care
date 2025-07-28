@@ -230,15 +230,32 @@ class ColorPanel(wx.Panel):
         dc.DrawRectangle(1, 1, width - 2, height - 2)
 
     def start_picking(self, event):
-        if not self.picking:
-            self.picking = True
-            self.SetCursor(wx.Cursor(wx.CURSOR_CROSS))
-            # Capture mouse and keyboard events globally
-            self.CaptureMouse()
-            self.Bind(wx.EVT_LEFT_DOWN, self.stop_picking)
-            self.Bind(wx.EVT_RIGHT_DOWN, self.stop_picking)
-            # Start timer for color sampling
-            self.timer.Start(50)  # Update every 50ms
+        # Use native color picker on macOS
+        if 'wxMSW' not in wx.PlatformInfo:
+            # Create color data with initial color
+            color_data = wx.ColourData()
+            color_data.SetColour(wx.Colour(*self.color))
+
+            # Create and show the color dialog
+            dlg = wx.ColourDialog(wx.GetTopLevelParent(self), color_data)
+            if dlg.ShowModal() == wx.ID_OK:
+                # Get the selected color
+                color = dlg.GetColourData().GetColour()
+                self.color = list(color.Get())
+                self.Refresh()
+            dlg.Destroy()
+        else:
+            print(wx.PlatformInfo)
+            # Use custom color picker on other platforms
+            if not self.picking:
+                self.picking = True
+                self.SetCursor(wx.Cursor(wx.CURSOR_CROSS))
+                # Capture mouse and keyboard events globally
+                self.CaptureMouse()
+                self.Bind(wx.EVT_LEFT_DOWN, self.stop_picking)
+                self.Bind(wx.EVT_RIGHT_DOWN, self.stop_picking)
+                # Start timer for color sampling
+                self.timer.Start(50)  # Update every 50ms
 
         event.Skip()
 

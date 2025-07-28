@@ -77,7 +77,7 @@ class AddSkeinDialog(wx.Dialog):
         button_sizer.AddButton(cancel_button)
         button_sizer.Realize()
 
-        main_sizer.Add(wx.StaticText(self, label='Click and drag to sample color from screen'))
+        main_sizer.Add(wx.StaticText(self, label='Click and drag to sample color from screen' if 'wxMSW' in wx.PlatformInfo else "Click on a panel to edit its colour"))
         main_sizer.Add(button_sizer, 0, wx.EXPAND, 5)
 
         self.SetSizer(main_sizer)
@@ -532,10 +532,17 @@ Skein Care is a native desktop application designed to help catalog thread skein
 3. Click "OK" to add the skein to your catalog
 
 ### Color Picking
+On Windows and Linux:
 1. Click and hold on a color square in the dialog
 2. Your cursor will change to a crosshair
 3. Drag over any area of your screen to sample
 4. Release to set the color
+
+On macOS:
+1. Click on a color square in the dialog
+2. The native macOS color picker will appear
+3. Select a color using the native interface
+4. Click OK to set the color
 
 ### Data Management
 - Click on any skein in your collection to edit its details
