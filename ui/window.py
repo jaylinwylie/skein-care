@@ -3,6 +3,7 @@ import wx.grid
 import wx.adv
 import json
 import os
+import webbrowser
 
 import updater
 from skein import Skein
@@ -449,36 +450,108 @@ class Window(wx.Frame):
     def on_check_updates(self, event):
         """Check for updates and display the result to the user."""
         try:
-            # Show a "checking for updates" message
-            self.SetStatusText("Checking for updates...")
-            current = updater.VERSION
-            latest = updater.query_latest(updater.USER, updater.REPO)["tag_name"]
-            print(f"Current version: {current}\nLatest version: {latest}")
-            if latest:
-                if updater.is_newer_version(updater.to_version(current), updater.to_version(latest)):
-                    dialog = wx.adv.AboutDialogInfo()
-                    dialog.SetName("Update")
-                    dialog.SetDescription(f"A new update is available!\n{current} -> {latest}")
-                    dialog.SetWebSite(updater.DOWNLOAD_LINK)
-                    wx.adv.AboutBox(dialog)
-                else:
-                    wx.MessageBox(f"You have the latest version.\n{current}", "Update Check", wx.OK | wx.ICON_INFORMATION)
-        except Exception as e:
-            print(f"Error checking for updates: {e}")
-            wx.MessageBox(f"Error checking for updates", "Error", wx.OK | wx.ICON_ERROR)
+            # Check if there is an update available
+            status, latest = updater.query_latest(updater.USER, updater.REPO)
+            if status:
+                latest_tag = latest["tag_name"]
+                body = latest["body"]
+                link = updater.KO_FI_URL
 
-        finally:
-            self.SetStatusText("")
+                if updater.is_newer_version(updater.to_version(updater.VERSION), updater.to_version(latest_tag)):
+                    dialog = wx.Dialog(self, title="Update Available", size=(300, 150))
+                    sizer = wx.BoxSizer(wx.VERTICAL)
+                    message = wx.StaticText(dialog, label=f"A new update is available!\n{updater.VERSION} -> {latest_tag}\n\n{body}")
+
+                    sizer.Add(message, 0, wx.ALL | wx.CENTER, 10)
+                    button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                    release_button = wx.Button(dialog, label="Go to Release")
+
+                    def on_release(event):
+                        webbrowser.open(updater.KO_FI_URL)
+                        dialog.EndModal(wx.ID_CANCEL)
+
+                    release_button.Bind(wx.EVT_BUTTON, on_release)
+                    button_sizer.Add(release_button, 0, wx.ALL, 5)
+                    sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 10)
+                    dialog.SetSizer(sizer)
+                    dialog.Fit()
+                    dialog.ShowModal()
+                    dialog.Destroy()
+
+        except Exception as e:
+            self.SetStatusText(f"Error checking for updates: {e}")
+
+
+    def update_at_launch(self):
+        """Update the application at launch."""
+        try:
+            # Check if there is an update available
+            status, latest = updater.query_latest(updater.USER, updater.REPO)
+            if status:
+                latest_tag = latest["tag_name"]
+                body = latest["body"]
+                link = updater.KO_FI_URL
+                
+                # Check if this version is in the skip list
+                skip_version = self.defaults.get('skip_version')
+                if skip_version and skip_version == latest_tag:
+                    # Skip this version as requested by the user
+                    return
+
+                if updater.is_newer_version(updater.to_version(updater.VERSION), updater.to_version(latest_tag)):
+                    dialog = wx.Dialog(self, title="Update Available", size=(300, 150))
+                    sizer = wx.BoxSizer(wx.VERTICAL)
+
+                    # Message text
+                    message = wx.StaticText(dialog, label=f"A new update is available!\n{updater.VERSION} -> {latest_tag}\n\n{body}")
+                    sizer.Add(message, 0, wx.ALL | wx.CENTER, 10)
+
+                    # Buttons
+                    button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                    skip_button = wx.Button(dialog, label="Skip Version")
+                    ignore_button = wx.Button(dialog, label="Ignore")
+                    release_button = wx.Button(dialog, label="Go to Release")
+
+                    # Bind events to buttons
+                    def on_skip(event):
+                        # Add this version to the skip list
+                        self.defaults['skip_version'] = latest_tag
+                        dialog.EndModal(wx.ID_CANCEL)
+
+                    def on_ignore(event):
+                        # Just close the dialog
+                        dialog.EndModal(wx.ID_CANCEL)
+
+                    def on_release(event):
+                        webbrowser.open(updater.KO_FI_URL)
+                        dialog.EndModal(wx.ID_CANCEL)
+
+                    skip_button.Bind(wx.EVT_BUTTON, on_skip)
+                    ignore_button.Bind(wx.EVT_BUTTON, on_ignore)
+                    release_button.Bind(wx.EVT_BUTTON, on_release)
+
+                    button_sizer.Add(skip_button, 0, wx.ALL, 5)
+                    button_sizer.Add(ignore_button, 0, wx.ALL, 5)
+                    button_sizer.Add(release_button, 0, wx.ALL, 5)
+                    sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 10)
+
+                    dialog.SetSizer(sizer)
+                    dialog.Fit()
+                    dialog.ShowModal()
+                    dialog.Destroy()
+
+        except Exception as e:
+            self.SetStatusText(f"Error checking for updates: {e}")
 
     def on_about(self, event):
         """Display the about dialog when the About menu item is clicked."""
         info = wx.adv.AboutDialogInfo()
         info.SetName("Skein Care")
         info.SetVersion(updater.VERSION)
-        info.SetDescription("~For my wife <3\n\nConsider Donating!")
+        info.SetDescription("~For my wife <3\n\n\n\n\n\nConsider Donating!")
         info.SetCopyright("(c) 2025 Jaylin Wylie Mayes")
         info.SetLicence(LICENCE)
-        info.SetWebSite(updater.DOWNLOAD_LINK)
+        info.SetWebSite(updater.KO_FI_URL)
         wx.adv.AboutBox(info)
 
     def on_readme(self, event):
@@ -492,7 +565,6 @@ class Window(wx.Frame):
         dialog.SetSizer(sizer)
         dialog.ShowModal()
         dialog.Destroy()
-
 
     def on_close(self, event):
         # Convert the dynamic menu item ID to the constant sort method value
@@ -531,23 +603,10 @@ Skein Care is a native desktop application designed to help catalog thread skein
    - Colors: Add one or more colors for the skein
 3. Click "OK" to add the skein to your catalog
 
-### Color Picking
-On Windows and Linux:
-1. Click and hold on a color square in the dialog
-2. Your cursor will change to a crosshair
-3. Drag over any area of your screen to sample
-4. Release to set the color
-
-On macOS:
-1. Click on a color square in the dialog
-2. The native macOS color picker will appear
-3. Select a color using the native interface
-4. Click OK to set the color
-
 ### Data Management
 - Click on any skein in your collection to edit its details
 - Skein collection is saved in "library.json"
-- Skein catalogs are stored in the "catalogs" folder as JSON files
+- Skein catalogs are stored in the "catalogs"
 - User preferences are saved in "defaults.json"
 """
 

@@ -81,12 +81,12 @@
 # }
 
 import requests
-VERSION = "v1.0.0"
+VERSION = "v0.0.0"
 
 USER = "jaylinwylie"
 REPO = "skein-care"
-DOWNLOAD_LINK = f"https://github.com/{USER}/{REPO}/releases"
-
+GITHUB_RELEASES_URL = f"https://github.com/{USER}/{REPO}/releases"
+KO_FI_URL = "https://ko-fi.com/s/011d38ab3b"
 
 def to_version(tag: str) -> tuple[int, ...]:
     return tuple(map(int, tag[1:].split(".")))
@@ -101,20 +101,16 @@ def is_newer_version(current: tuple, latest: tuple):
     return False
 
 
-def query_latest(user, repo):
+def query_latest(user, repo) -> tuple[bool, str | dict]:
     try:
         url = f"https://api.github.com/repos/{user}/{repo}/releases/latest"
         response = requests.get(url, timeout=10)  # Add timeout to prevent hanging
 
         if response.status_code == 200:
-            return response.json()
+            return True, response.json()
         else:
-            print(f"Failed to query latest version: {response.status_code}")
-            return None
+            return False, f"Failed to query latest version: {response.status_code}"
     except requests.exceptions.RequestException as e:
-        print(f"Network error when checking for updates: {e}")
-        return None
+        return False, f"Network error when checking for updates: {e}"
     except Exception as e:
-        print(f"Unexpected error when checking for updates: {e}")
-        return None
-
+        return False, f"Unexpected error when checking for updates: {e}"
