@@ -78,7 +78,7 @@ class AddSkeinDialog(wx.Dialog):
         button_sizer.AddButton(cancel_button)
         button_sizer.Realize()
 
-        main_sizer.Add(wx.StaticText(self, label='Click and drag to sample color from screen' if 'wxMSW' in wx.PlatformInfo else "Click on a panel to edit its colour"))
+        main_sizer.Add(wx.StaticText(self, label='Left-click and drag to sample color from screen, right-click to open color dialog' if 'wxMSW' in wx.PlatformInfo else "Click on a panel to edit its colour"))
         main_sizer.Add(button_sizer, 0, wx.EXPAND, 5)
 
         self.SetSizer(main_sizer)
@@ -156,6 +156,61 @@ class AddSkeinDialog(wx.Dialog):
         return True
 
 
+class EditSkeinDialog(AddSkeinDialog):
+    def __init__(self, parent, model, skein: Skein):
+        super().__init__(parent, model)
+        
+        # Change the dialog title to reflect editing
+        self.SetTitle(f"Edit Skein - {skein.brand} {skein.sku}")
+        
+        # Populate the fields with the existing skein data
+        self.brand_input.SetValue(skein.brand.upper())
+        self.name_input.SetValue(skein.name)
+        self.sku_input.SetValue(skein.sku)
+        
+        self.sku_input.Enable(False)
+        self.brand_input.Enable(False)
+
+        # Set up the color panels
+        self.color_panels[0].color = skein.color[0]
+        for color in skein.color[1:]:
+            self.add_color(event=None)
+            self.color_panels[-1].color = color
+        
+        # Store the original skein for reference
+        self.original_skein = skein
+        
+        # Add delete button
+        button_sizer = self.GetSizer().GetItem(self.GetSizer().GetItemCount() - 1).GetSizer()
+        self.delete_button = wx.Button(self, label="Delete Skein")
+        button_sizer.Insert(0, self.delete_button, 0, wx.ALL, 5)
+        
+        # Bind delete button event
+        self.delete_button.Bind(wx.EVT_BUTTON, self.on_delete)
+        
+        # Refresh layout
+        self.Layout()
+    
+    def on_delete(self, event):
+        # Show confirmation dialog
+        brand = self.original_skein.brand
+        sku = self.original_skein.sku
+        name = self.original_skein.name
+        
+        message = f"Are you sure you want to delete this skein?\n\nBrand: {brand.upper()}\nSKU: {sku}\nName: {name}\n\nThis will permanently remove it from the catalog."
+        dialog = wx.MessageDialog(self, message, "Confirm Delete", wx.YES_NO | wx.ICON_WARNING)
+        
+        if dialog.ShowModal() == wx.ID_YES:
+            # Delete the skein
+            if self.model.delete_skein(brand, sku):
+                wx.MessageBox(f"Skein {brand.upper()} {sku} has been deleted.", "Success", wx.OK | wx.ICON_INFORMATION)
+                self.EndModal(wx.ID_CANCEL)  # Close the dialog
+            else:
+                wx.MessageBox("Failed to delete the skein.", "Error", wx.OK | wx.ICON_ERROR)
+        
+        dialog.Destroy()
+
+
 class Window(wx.Frame):
     def __init__(self, skein_model, defaults: dict = None):
         self.skein_panels = {}
@@ -175,7 +230,7 @@ class Window(wx.Frame):
         self.Bind(wx.EVT_MENU, self.add_skein, add_skein_item)
         file_menu.AppendSeparator()
 
-        self.toggle_item = file_menu.AppendCheckItem(wx.ID_ANY, "Show All Skeins")
+        self.toggle_item = file_menu.AppendCheckItem(wx.ID_ANY, "Show Library Only")
         self.toggle_item.Check(True)
         self.Bind(wx.EVT_MENU, self.toggle_skeins_visibility, self.toggle_item)
 
@@ -325,7 +380,7 @@ class Window(wx.Frame):
         total_skeins = 0
         unique_skeins = 0
 
-        is_show_all_skeins = self.toggle_item.IsChecked()
+        is_show_all_skeins = not self.toggle_item.IsChecked()
         search_text = self.search_bar.GetValue().lower()
         for brand, brand_skeins in self.model.catalog.skeins.items():
             for sku, skein in brand_skeins.items():
@@ -382,11 +437,6 @@ class Window(wx.Frame):
         self.populate_grid()
 
     def toggle_skeins_visibility(self, event):
-        show_all = event.IsChecked()
-        if show_all:
-            self.toggle_item.SetItemLabel("Show All Skeins")
-        else:
-            self.toggle_item.SetItemLabel("Show Library Only")
         self.update_panel_visibility()
         self.populate_grid()
 
@@ -407,17 +457,12 @@ class Window(wx.Frame):
         dialog.Destroy()
 
     def edit_skein(self, skein: Skein):
-        dialog = AddSkeinDialog(self, self.model)
-        dialog.brand_input.SetValue(skein.brand.upper())
-        dialog.name_input.SetValue(skein.name)
-        dialog.sku_input.SetValue(skein.sku)
+        """Edit a skein and return True if the skein was deleted, False otherwise."""
+        dialog = EditSkeinDialog(self, self.model, skein)
+        was_deleted = False
 
-        dialog.color_panels[0].color = skein.color[0]
-        for color in skein.color[1:]:
-            dialog.add_color(event=None)
-            dialog.color_panels[-1].color = color
-
-        if dialog.ShowModal() == wx.ID_OK:
+        result = dialog.ShowModal()
+        if result == wx.ID_OK:
             if dialog.save_skein():
                 wx.MessageBox("Skein edited successfully.", "Success", wx.OK | wx.ICON_INFORMATION)
 
@@ -428,8 +473,22 @@ class Window(wx.Frame):
                 self.populate_grid()
                 self.update_panel_visibility()
                 self.populate_grid()
+        elif result == wx.ID_CANCEL:
+            # Check if the skein was deleted (we need to update the UI)
+            if skein.brand in self.model.catalog.skeins and skein.sku in self.model.catalog.skeins[skein.brand]:
+                # Skein still exists, do nothing
+                pass
+            else:
+                # Skein was deleted, update UI
+                was_deleted = True
+                if (skein.brand, skein.sku) in self.skein_panels:
+                    self.skein_panels[(skein.brand, skein.sku)].Destroy()
+                    del self.skein_panels[(skein.brand, skein.sku)]
+                self.update_panel_visibility()
+                self.populate_grid()
 
         dialog.Destroy()
+        return was_deleted
 
     def update_skein_count(self, brand, sku, count):
         print(f"Updated skein count for {brand} - {sku} to {count}")
