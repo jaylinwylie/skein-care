@@ -300,6 +300,7 @@ class Window(wx.Frame):
         self.search_bar.SetHint("Search by SKU or name...")
         self.search_bar.Bind(wx.EVT_SEARCH, self.search)
         self.search_bar.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.search)
+        self.search_bar.Bind(wx.EVT_TEXT, self.search)
 
         main_sizer.Add(self.search_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 20)
 
@@ -441,9 +442,10 @@ class Window(wx.Frame):
         self.populate_grid()
 
     def search(self, event):
-        # search_text = event.GetString()
-        # if not search_text:
-            # self.search_bar.SetValue('')
+        # Get the current search text
+        search_text = self.search_bar.GetValue()
+        # Always update panel visibility and populate grid, whether search text is empty or not
+        # This ensures filters are cleared when search bar is empty
         self.update_panel_visibility()
         self.populate_grid()
 
