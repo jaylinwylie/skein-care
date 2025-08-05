@@ -231,7 +231,7 @@ class Window(wx.Frame):
         file_menu.AppendSeparator()
 
         self.toggle_item = file_menu.AppendCheckItem(wx.ID_ANY, "Show Library Only")
-        self.toggle_item.Check(True)
+        self.toggle_item.Check(False)
         self.Bind(wx.EVT_MENU, self.toggle_skeins_visibility, self.toggle_item)
 
         menubar.Append(file_menu, "&File")
@@ -641,7 +641,7 @@ class Window(wx.Frame):
             sort_method = self.SORT_BY_COUNT
 
         self.defaults.update({
-                "window_size": (self.GetSize().x, self.GetSize().y),
+                "window_size": (self.GetClientSize().x, self.GetClientSize().y),
                 "window_position": (self.GetPosition().x, self.GetPosition().y),
                 "sort_method": sort_method
         })
