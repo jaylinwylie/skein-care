@@ -10,7 +10,7 @@ from model import SkeinModel
 
 app = wx.App()
 library: dict[str, dict[str, int]] = {}
-catalog = Catalog()
+catalog: Catalog = Catalog()
 
 print("Loading catalogs...")
 catalogs_dir = "catalogs"
@@ -88,3 +88,7 @@ except Exception as e:
 
 print("Exiting...")
 sys.exit(exit_code)
+
+
+
+
