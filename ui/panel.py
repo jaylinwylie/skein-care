@@ -168,9 +168,23 @@ class SkeinPanel(wx.Panel):
 
     def on_click(self, event):
         print(f"{self.skein.name} clicked")
+        # Store brand and SKU before editing
+        brand = self.skein.brand
+        sku = self.skein.sku
+
+        # Call edit function
         self.EDIT_SKEIN(self.skein)
-        self.color_panel.render_buffer = None
-        self.color_panel.Refresh()
+
+        # Check if this panel still exists in the parent's skein_panels dictionary
+        try:
+            parent = self.GetParent()
+        except RuntimeError:
+            return
+        if hasattr(parent, 'skein_panels') and (brand, sku) in parent.skein_panels:
+            # Panel still exists, safe to refresh
+            self.color_panel.render_buffer = None
+            self.color_panel.Refresh()
+
         event.Skip()
 
     def _decrease_value(self, event):
@@ -214,6 +228,10 @@ class ColorPanel(wx.Panel):
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.Bind(wx.EVT_LEFT_DOWN, self.start_picking)
         self.Bind(wx.EVT_LEFT_UP, self.stop_picking)
+        
+        # Bind right-click for Windows users to open native color dialog
+        if 'wxMSW' in wx.PlatformInfo:
+            self.Bind(wx.EVT_RIGHT_DOWN, self.open_color_dialog)
 
     def on_paint(self, event):
         dc = wx.PaintDC(self)
@@ -285,4 +303,19 @@ class ColorPanel(wx.Panel):
             self.Unbind(wx.EVT_RIGHT_DOWN)
 
             self.timer.Stop()
+        event.Skip()
+        
+    def open_color_dialog(self, event):
+        # Create color data with initial color
+        color_data = wx.ColourData()
+        color_data.SetColour(wx.Colour(*self.color))
+        
+        # Create and show the color dialog
+        dlg = wx.ColourDialog(wx.GetTopLevelParent(self), color_data)
+        if dlg.ShowModal() == wx.ID_OK:
+            # Get the selected color
+            color = dlg.GetColourData().GetColour()
+            self.color = list(color.Get())
+            self.Refresh()
+        dlg.Destroy()
         event.Skip()
