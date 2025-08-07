@@ -511,96 +511,20 @@ class Window(wx.Frame):
     def on_check_updates(self, event):
         """Check for updates and display the result to the user."""
         try:
-            # Check if there is an update available
-            status, latest = updater.query_latest(updater.USER, updater.REPO)
-            if status:
-                latest_tag = latest["tag_name"]
-                body = latest["body"]
-                link = updater.KO_FI_URL
-
-                if updater.is_newer_version(updater.to_version(updater.VERSION), updater.to_version(latest_tag)):
-                    dialog = wx.Dialog(self, title="Update Available", size=(300, 150))
-                    sizer = wx.BoxSizer(wx.VERTICAL)
-                    message = wx.StaticText(dialog, label=f"A new update is available!\n{updater.VERSION} -> {latest_tag}\n\n{body}")
-
-                    sizer.Add(message, 0, wx.ALL | wx.CENTER, 10)
-                    button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-                    release_button = wx.Button(dialog, label="Go to Release")
-
-                    def on_release(event):
-                        webbrowser.open(updater.KO_FI_URL)
-                        dialog.EndModal(wx.ID_CANCEL)
-
-                    release_button.Bind(wx.EVT_BUTTON, on_release)
-                    button_sizer.Add(release_button, 0, wx.ALL, 5)
-                    sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 10)
-                    dialog.SetSizer(sizer)
-                    dialog.Fit()
-                    dialog.ShowModal()
-                    dialog.Destroy()
-
+            # Use the updater.gui dialog to check for updates
+            # Pass True to show a message when no update is available
+            # Pass self.defaults to allow storing skipped versions
+            updater.check_for_updates_dialog(self)
         except Exception as e:
             self.SetStatusText(f"Error checking for updates: {e}")
-
 
     def update_at_launch(self):
         """Update the application at launch."""
         try:
-            # Check if there is an update available
-            status, latest = updater.query_latest(updater.USER, updater.REPO)
-            if status:
-                latest_tag = latest["tag_name"]
-                body = latest["body"]
-                link = updater.KO_FI_URL
-                
-                # Check if this version is in the skip list
-                skip_version = self.defaults.get('skip_version')
-                if skip_version and skip_version == latest_tag:
-                    # Skip this version as requested by the user
-                    return
-
-                if updater.is_newer_version(updater.to_version(updater.VERSION), updater.to_version(latest_tag)):
-                    dialog = wx.Dialog(self, title="Update Available", size=(300, 150))
-                    sizer = wx.BoxSizer(wx.VERTICAL)
-
-                    # Message text
-                    message = wx.StaticText(dialog, label=f"A new update is available!\n{updater.VERSION} -> {latest_tag}\n\n{body}")
-                    sizer.Add(message, 0, wx.ALL | wx.CENTER, 10)
-
-                    # Buttons
-                    button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-                    skip_button = wx.Button(dialog, label="Skip Version")
-                    ignore_button = wx.Button(dialog, label="Ignore")
-                    release_button = wx.Button(dialog, label="Go to Release")
-
-                    # Bind events to buttons
-                    def on_skip(event):
-                        # Add this version to the skip list
-                        self.defaults['skip_version'] = latest_tag
-                        dialog.EndModal(wx.ID_CANCEL)
-
-                    def on_ignore(event):
-                        # Just close the dialog
-                        dialog.EndModal(wx.ID_CANCEL)
-
-                    def on_release(event):
-                        webbrowser.open(updater.KO_FI_URL)
-                        dialog.EndModal(wx.ID_CANCEL)
-
-                    skip_button.Bind(wx.EVT_BUTTON, on_skip)
-                    ignore_button.Bind(wx.EVT_BUTTON, on_ignore)
-                    release_button.Bind(wx.EVT_BUTTON, on_release)
-
-                    button_sizer.Add(skip_button, 0, wx.ALL, 5)
-                    button_sizer.Add(ignore_button, 0, wx.ALL, 5)
-                    button_sizer.Add(release_button, 0, wx.ALL, 5)
-                    sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 10)
-
-                    dialog.SetSizer(sizer)
-                    dialog.Fit()
-                    dialog.ShowModal()
-                    dialog.Destroy()
-
+            # Use the updater.gui dialog to check for updates
+            # Pass False to not show a message when no update is available
+            # Pass self.defaults to allow storing skipped versions
+            updater.check_for_updates_dialog(self,self.defaults)
         except Exception as e:
             self.SetStatusText(f"Error checking for updates: {e}")
 
