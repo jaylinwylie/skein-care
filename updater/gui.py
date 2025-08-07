@@ -1,6 +1,6 @@
 import webbrowser
 import wx
-
+import requests
 import updater
 from updater.update import check_for_updates
 
@@ -82,6 +82,13 @@ def check_for_updates_dialog(parent_window, defaults: dict = None):
                 with wx.MessageDialog(parent_window, f"You have the latest version installed.", "Up to Date", wx.OK | wx.ICON_INFORMATION) as dialog:
                     dialog.ShowModal()
             return False
+
+    except requests.exceptions.ConnectionError:
+        error_message = f"Failed to query github, No network connection."
+        if not defaults:
+            with wx.MessageDialog(parent_window, error_message, "Connection error", wx.OK | wx.ICON_INFORMATION) as dialog:
+                dialog.ShowModal()
+        return False
 
     except Exception as e:
         error_message = f"Error checking for updates: {str(e)}"

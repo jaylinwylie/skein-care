@@ -20,19 +20,12 @@ def is_newer_version(current: tuple, latest: tuple):
 
 
 def query_latest() -> dict:
-    try:
-        url = f"https://api.github.com/repos/{USER_REPO}/releases/latest"
-        response = requests.get(url, timeout=10)  # Add timeout to prevent hanging
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"Failed to query latest version: {response.status_code}")
-
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Network error when checking for updates: {e}")
-
-    except Exception as e:
-        raise Exception(f"Unexpected error when checking for updates: {e}")
+    url = f"https://api.github.com/repos/{USER_REPO}/releases/latest"
+    response = requests.get(url, timeout=10)  # Add timeout to prevent hanging
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Failed to query latest version: {response.status_code}")
 
 
 def check_for_updates(skip_version: str = None) -> dict | None:

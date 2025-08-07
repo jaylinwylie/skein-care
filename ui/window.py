@@ -519,14 +519,7 @@ class Window(wx.Frame):
             self.SetStatusText(f"Error checking for updates: {e}")
 
     def update_at_launch(self):
-        """Update the application at launch."""
-        try:
-            # Use the updater.gui dialog to check for updates
-            # Pass False to not show a message when no update is available
-            # Pass self.defaults to allow storing skipped versions
-            updater.check_for_updates_dialog(self,self.defaults)
-        except Exception as e:
-            self.SetStatusText(f"Error checking for updates: {e}")
+        updater.check_for_updates_dialog(self,self.defaults)
 
     def on_about(self, event):
         """Display the about dialog when the About menu item is clicked."""
