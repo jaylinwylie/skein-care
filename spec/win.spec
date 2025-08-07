@@ -3,7 +3,7 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE
 
 
 a = Analysis(
-    ['main.py'],
+    ['../main.py'],
     pathex=[],
     binaries=[],
     datas=[],

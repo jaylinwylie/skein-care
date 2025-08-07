@@ -2,7 +2,7 @@
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, BUNDLE
 
 a = Analysis(
-    ['main.py'],
+    ['../main.py'],
     pathex=[],
     binaries=[],
     datas=[],

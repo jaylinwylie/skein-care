@@ -2,9 +2,9 @@
 from PyInstaller.building.build_main import Analysis, PYZ, EXE
 
 a = Analysis(
-    ['main.py'],
+    ['../main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[("/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0", ".")],
     datas=[],
     hiddenimports=[],
     hookspath=[],
