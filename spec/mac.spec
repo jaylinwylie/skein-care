@@ -39,7 +39,7 @@ app = BUNDLE(
     a.binaries,
     a.datas,
     name='Skeincare.app',
-    icon='thread.png',
+    icon='../thread.png',
     bundle_identifier=None,
     info_plist={
         'NSHighResolutionCapable': 'True',

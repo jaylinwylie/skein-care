@@ -23,7 +23,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     name='Skeincare',
-    icon='thread.png',
+    icon='../thread.png',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
