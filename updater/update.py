@@ -3,7 +3,7 @@ import requests
 
 import updater
 
-USER_REPO = "jaylinwylie/skein-care"
+USER_REPO = "jaylinwylie/skeincare"
 
 
 def to_version(tag: str) -> tuple[int, ...]:
