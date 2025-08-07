@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.building.build_main import Analysis, PYZ, EXE
 
 a = Analysis(
     ['main.py'],
@@ -20,7 +21,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
-    name='Skein Care',
+    name='Skeincare',
     icon='thread.png',
     debug=False,
     bootloader_ignore_signals=False,
