@@ -2,6 +2,8 @@
 
 A native desktop application designed to help catalog thread skeins for embroidery, cross-stitch, and other fiber arts.
 
+![Skeincare for Windows](skeincare-windows-screenshot.png)
+
 ## Features
 
 - Track your thread inventory with adjustable counters
