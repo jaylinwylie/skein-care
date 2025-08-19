@@ -11,35 +11,45 @@ A native desktop application designed to help catalog thread skeins for embroide
 
 ## Installation
 
-1. Ensure you have Python installed
-2. Install required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Run the application:
-   ```
-   python main.py
-   ```
+### Windows .exe
+- Extract the ZIP file to a location of your choice.
+- Run `Skeincare.exe` to start the application.
 
-## Usage
+**Note:** Since the application is not signed with a certificate, Windows may display a security warning. To run the application:
+- Click "More info" on the warning dialog. 
+- Click "Run anyway" to proceed.
 
-### Adding New Skeins
-1. Click on "File" > "Add New Skein"
-2. Enter details:
-   - Brand: The manufacturer of the skein
-   - SKU: The product code/number
-   - Name: The color name or description
-   - Colors: Add one or more colors for the skein
-3. Click "OK" to add the skein to your catalog
+### Mac .app
+- Extract the ZIP file to a location of your choice.
+- Move `Skeincare.app` to your Applications folder.
+- Right-click on `Skeincare.app` and select "Open" to bypass macOS security restrictions.
 
-### Color Picking
-1. Click and hold on a color square in the dialog
-2. Your cursor will change to a crosshair
-3. Drag over any area of your screen to sample
-4. Release to set the color
+**Note:** Since the application is not signed with an Apple Developer certificate, macOS may display a security warning. The first time you run the application, you'll need to right-click and select "Open" instead of double-clicking.
 
-### Data Management
-- Click on any skein in your collection to edit its details
-- Skein collection is saved in "library.json"
-- Skein catalogs are stored in the "catalogs" folder as JSON files
-- User preferences are saved in "defaults.json"
+### Linux binary
+- Extract the archive to a location of your choice.
+- Make the binary executable: `chmod +x Skeincare`
+- Run the application: `./Skeincare`
+
+### From Source
+To run the application from source:
+- Clone the repository:
+  - `git clone https://github.com/jaylinwylie/skein-care.git`
+  - `cd skein-care` 
+- Create virtual environment: `python -m venv .venv`
+- Activate virtual environment
+  - For Windows: `.\.venv\Scripts\activate`
+  - For MacOS/Linux: `source .venv/bin/activate`
+- Install the required dependencies: `pip install -r requirements.txt`
+- Run the application: `python main.py`
+
+### Building
+To build the application for your platform:
+- Install the builder:
+  - `pip install pyinstaller`
+- Build
+  - For Windows: `pyinstaller spec/win.spec`
+  - For MacOS: `pyinstaller spec/mac.spec`
+  - For Linux: `pyinstaller spec/linux.spec`
+
+The binary will be created in the `dist` directory.
